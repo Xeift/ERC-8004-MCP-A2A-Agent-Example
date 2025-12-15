@@ -8,6 +8,7 @@
     "build": "tsc -p .",
     "agent:a1": "npm run build && node dist/agent1/index.js",
     "agent:a2": "npm run build && node dist/agent2/index.js",
+    "agent:a3": "npm run build && node dist/agent3/index.js",
     "server:a1": "npx tsx src/agent1/mcp-server.ts",
     "server:a2": "npx tsx src/agent2/mcp-server.ts"
   },
