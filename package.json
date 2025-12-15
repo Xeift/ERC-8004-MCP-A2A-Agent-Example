@@ -1,0 +1,38 @@
+{
+  "name": "test-agent-mk1",
+  "version": "1.0.0",
+  "description": "",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1",
+    "build": "tsc -p .",
+    "agent:a1": "npm run build && node dist/agent1/index.js",
+    "agent:a2": "npm run build && node dist/agent2/index.js",
+    "server:a1": "npx tsx src/agent1/mcp-server.ts",
+    "server:a2": "npx tsx src/agent2/mcp-server.ts"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "type": "module",
+  "dependencies": {
+    "@a2a-js/sdk": "^0.3.6",
+    "@modelcontextprotocol/sdk": "^1.24.3",
+    "@openai/agents": "^0.3.4",
+    "dotenv": "^17.2.3",
+    "express": "^5.2.1",
+    "openai": "^6.10.0",
+    "uuid": "^13.0.0",
+    "zod": "^3.25.76"
+  },
+  "devDependencies": {
+    "@types/express": "^5.0.6",
+    "@typescript-eslint/eslint-plugin": "^8.49.0",
+    "@typescript-eslint/parser": "^8.49.0",
+    "eslint": "^9.39.1",
+    "globals": "^16.5.0",
+    "ts-node": "^10.9.2",
+    "typescript": "^5.9.3",
+    "typescript-eslint": "^8.49.0"
+  }
+}
