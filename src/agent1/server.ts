@@ -20,7 +20,7 @@ async function main() {
   // ========================================
   // ========================================
 
-  // -----  create mpc server  -----
+  // -----  create mcp server  -----
   const mcpServer = new McpServer({
     name: 'crypto-price-mcp',
     version: '1.0.0',

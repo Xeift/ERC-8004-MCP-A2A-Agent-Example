@@ -3,44 +3,48 @@ import 'dotenv/config';
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { StreamableHTTPServerTransport } from '@modelcontextprotocol/sdk/server/streamableHttp.js';
 import express, { type Request, type Response } from 'express';
-// import { getBlockNumber } from './get-block-number.js';
+import { z } from 'zod';
+import { generateImage } from './generate-image.js';
+import { uploadImgbb } from './upload-imgbb.js';
 
 async function main() {
-  // -----  create mpc server   -----
+  // -----  create mpc server  -----
   const mcpServer = new McpServer({
-    name: 'ethereum-block-mcp',
+    name: 'generate-image-mcp',
     version: '1.0.0',
   });
 
-  // -----  register available tool to mpc server   -----
-  // mcpServer.registerTool(
-  //   'get_block_number',
-  //   {
-  //     title: 'Get block number',
-  //     description: 'Get the current Ethereum block number in hex and dec.',
-  //     inputSchema: {},
-  //   },
-  //   async () => {
-  //     const data = await getBlockNumber(); // call actual tool
-  //     return {
-  //       content: [
-  //         {
-  //           type: 'text',
-  //           text: JSON.stringify(data),
-  //         },
-  //       ],
-  //       structuredContent: data,
-  //     };
-  //   },
-  // );
+  // -----  register available tool to mcp server  -----
+  mcpServer.registerTool(
+    'generate_image',
+    {
+      title: 'Generate image',
+      description: 'Generate image from a given prompt. Return a generated image URL. ',
+      inputSchema: {
+        prompt: z.string().describe('The prompt to generate the image. e.g.: A cute robot, pixel_art'),
+      },
+    },
+    async ({ prompt }) => {
+      const imgBase64 = await generateImage(prompt); // call actual tool
+      const imgURL = await uploadImgbb(imgBase64);
+      return {
+        content: [
+          {
+            type: 'text',
+            text: imgURL
+          },
+        ],
+      };
+    },
+  );
 
-  // -----  convert http <-> mcp   -----
+  // -----  convert http <-> mcp  -----
   const transport = new StreamableHTTPServerTransport({
     sessionIdGenerator: undefined,
   });
   await mcpServer.connect(transport);
 
-  // -----  create http server using express   -----
+  // -----  create http server using express  -----
   const app = express();
   app.use(express.json());
 

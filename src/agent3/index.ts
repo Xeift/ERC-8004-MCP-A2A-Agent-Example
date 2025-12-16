@@ -3,7 +3,7 @@ import 'dotenv/config';
 import { z } from 'zod';
 import { callA2AServer, fetchAgentCard } from './a2a-client.js';
 
-import { Agent, run, RunResult, setDefaultOpenAIClient, setOpenAIAPI, setTracingDisabled, tool } from '@openai/agents';
+import { Agent, MCPServerStreamableHttp, run, RunResult, setDefaultOpenAIClient, setOpenAIAPI, setTracingDisabled, tool } from '@openai/agents';
 import { OpenAI } from 'openai/client.js';
 
 
@@ -37,12 +37,12 @@ const callA2AServerTool = tool({
 });
 
 // -----  add agent2 mcp server  ----
-// const agent2McpServer = new MCPServerStreamableHttp({
-//   url: `http://localhost:${process.env.A2_SERVER_PORT}/mcp`,
-//   name: 'Agent2 MCP Server',
-//   cacheToolsList: true,
-// });
-// await agent2McpServer.connect();
+const agent2McpServer = new MCPServerStreamableHttp({
+  url: `http://localhost:${process.env.A2_SERVER_PORT}/mcp`,
+  name: 'Agent2 MCP Server',
+  cacheToolsList: false,
+});
+await agent2McpServer.connect();
 
 // -----  create agent  -----
 const agent = new Agent({
@@ -58,13 +58,8 @@ const agent = new Agent({
   // model: 'amazon/nova-2-lite-v1:free',
   model: 'nvidia/nemotron-3-nano-30b-a3b:free',
   tools: [fetchAgentCardTool, callA2AServerTool],
+  mcpServers: [agent2McpServer]
 });
-
-const result = await run(
-  agent,
-  '幫我產生 ERC-8004 的日報',
-);
-printResult(result);
 
 // -----  print each round message  -----
 function printResult(result: RunResult<any, Agent<any, any>>) {
@@ -103,3 +98,11 @@ function printResult(result: RunResult<any, Agent<any, any>>) {
   console.log(result.finalOutput);
   console.log(`----------  最終輸出  ----------\n`);
 }
+
+const result = await run(
+  agent,
+  // '幫我產生 ERC-8004 的日報',
+  '暫時性任務：幫我產生一張像素機器人的圖片，prompt 由你設計',
+);
+printResult(result);
+await agent2McpServer.close();
