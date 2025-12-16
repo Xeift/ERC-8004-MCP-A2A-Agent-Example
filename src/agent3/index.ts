@@ -1,6 +1,5 @@
 import 'dotenv/config';
 
-import { writeFileSync } from 'node:fs';
 import { z } from 'zod';
 import { callA2AServer, fetchAgentCard } from './a2a-client.js';
 
@@ -58,10 +57,7 @@ const agent = new Agent({
   `,
   // model: 'amazon/nova-2-lite-v1:free',
   model: 'nvidia/nemotron-3-nano-30b-a3b:free',
-  // model: 'openai/gpt-oss-20b:free',
-  // model: 'z-ai/glm-4.5-air:free',
   tools: [fetchAgentCardTool, callA2AServerTool],
-  // mcpServers: [agent2McpServer],
 });
 
 const result = await run(
@@ -69,11 +65,9 @@ const result = await run(
   '幫我產生 ERC-8004 的日報',
 );
 printResult(result);
-// await agent2McpServer.close();
 
 function printResult(result: RunResult<any, Agent<any, any>>) {
   const json = JSON.stringify(result.output, null, 2);
-  writeFileSync('llm-output-logs.json', json, 'utf-8'); // TODO: remove later
 
   function printJson(input: any): string {
     if (input !== null && typeof input === 'object') {

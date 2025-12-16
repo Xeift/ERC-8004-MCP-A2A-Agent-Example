@@ -1,6 +1,5 @@
 import 'dotenv/config';
 
-import { writeFileSync } from 'node:fs';
 import { z } from 'zod';
 // import { getBlockNumber } from './get-block-number.js';
 
@@ -63,7 +62,6 @@ await agent1McpServer.close();
 
 function printResult(result: RunResult<any, Agent<any, any>>) {
   const json = JSON.stringify(result.output, null, 2);
-  writeFileSync('llm-output-logs.json', json, 'utf-8'); // TODO: remove later
 
   function printJson(input: any): string {
     if (input !== null && typeof input === 'object') {

@@ -1,6 +1,5 @@
 import 'dotenv/config';
 
-import { writeFileSync } from 'node:fs';
 import { z } from 'zod';
 import { getCryptoPrice } from './get-crypto-price.js';
 
@@ -51,15 +50,12 @@ const agent = new Agent({
   name: 'Assistant',
   instructions: '一律用繁體中文（zh-TW）回覆所有問題。你是一位專業的 Web3 研究員。使用者發問時，先用 tavily_search 工具搜尋，再用 get_crypto_price 工具取得即時幣價資料。',
   model: 'amazon/nova-2-lite-v1:free',
-  // model: 'openai/gpt-oss-20b:free',
-  // model: 'z-ai/glm-4.5-air:free',
   tools: [getCryptoPriceTool, getBlockNumberTool],
   mcpServers: [tavilyMcpServer],
 });
 
 function printResult(result: RunResult<any, Agent<any, any>>) {
   const json = JSON.stringify(result.output, null, 2);
-  writeFileSync('llm-output-logs.json', json, 'utf-8'); // TODO: remove later
 
   function printJson(input: any): string {
     if (input !== null && typeof input === 'object') {
