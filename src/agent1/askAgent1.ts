@@ -93,9 +93,13 @@ function printResult(result: RunResult<any, Agent<any, any>>) {
   console.log(`----------   最終輸出    ----------\n`);
 }
 
-const result = await run(
-  agent,
-  '幫我查關於以太坊的最新資訊和即時鏈上數據',
-);
-printResult(result);
-await tavilyMcpServer.close();
+export async function askAgent1(message: string): Promise<string> {
+  const result = await run(
+    agent,
+    message,
+  );
+  printResult(result);
+  await tavilyMcpServer.close();
+  const response = result.finalOutput!;
+  return response;
+}

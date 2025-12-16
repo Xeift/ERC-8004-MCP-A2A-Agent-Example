@@ -21,7 +21,7 @@ setDefaultOpenAIClient(
 // -----  add custom tool   -----
 const fetchAgentCardTool = tool({
   name: 'fetch_agent_card',
-  description: 'Fetch A2A Agent Card by providing baseURL. baseURL only contains domain and port(if any).',
+  description: 'Fetch A2A Agent Card by providing baseURL. baseURL only contains scheme, domain and port(if any).',
   parameters: z.object({ baseURL: z.string() }),
   execute: async ({ baseURL }) => {
     return await fetchAgentCard(baseURL);
@@ -30,7 +30,7 @@ const fetchAgentCardTool = tool({
 
 const callA2AServerTool = tool({
   name: 'call_a2a_server',
-  description: 'Call any A2A server by providing baseURL and message. baseURL only contains domain and port(if any).',
+  description: 'Call any A2A server by providing baseURL and message. baseURL only contains scheme, domain and port(if any).',
   parameters: z.object({ baseURL: z.string(), message: z.string() }),
   execute: async ({ baseURL, message }) => {
     return await callA2AServer(baseURL, message);

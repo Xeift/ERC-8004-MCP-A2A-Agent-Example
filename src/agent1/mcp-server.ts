@@ -8,6 +8,7 @@ import { StreamableHTTPServerTransport } from '@modelcontextprotocol/sdk/server/
 import express, { type Request, type Response } from 'express';
 import { v4 as uuidv4 } from 'uuid';
 import { z } from 'zod';
+import { askAgent1 } from './askAgent1.js';
 import { getCryptoPrice } from './get-crypto-price.js';
 
 const PORT = process.env.A1_SERVER_PORT;
@@ -67,7 +68,6 @@ async function main() {
       const parts = requestContext.userMessage?.parts ?? [];
 
       let userText = '';
-
       for (const part of parts) {
         if (part.kind === 'text') {
           const textPart = part as TextPart;
@@ -75,13 +75,18 @@ async function main() {
           break;
         }
       }
+      console.log('----------   server: 收到訊息    ----------');
+      console.log(userText);
+      console.log('----------   server: 收到訊息    ----------');
+
+      const response = await askAgent1(userText);
 
       const msg: Message = {
         kind: 'message',
         messageId: uuidv4(),
         role: 'agent',
         contextId: requestContext.contextId,
-        parts: [{ kind: 'text', text: `Hello from A2A. You said: ${userText}` }],
+        parts: [{ kind: 'text', text: response }],
       };
 
       eventBus.publish(msg);
