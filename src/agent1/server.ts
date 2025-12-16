@@ -75,9 +75,9 @@ async function main() {
           break;
         }
       }
-      console.log('----------   server: 收到訊息    ----------');
+      console.log('----------  server: 收到遠端訊息  ----------');
       console.log(userText);
-      console.log('----------   server: 收到訊息    ----------');
+      console.log('----------  server: 收到遠端訊息  ----------\n');
 
       const response = await askAgent1(userText);
 
