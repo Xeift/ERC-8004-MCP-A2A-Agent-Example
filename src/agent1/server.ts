@@ -8,7 +8,7 @@ import { StreamableHTTPServerTransport } from '@modelcontextprotocol/sdk/server/
 import express, { type Request, type Response } from 'express';
 import { v4 as uuidv4 } from 'uuid';
 import { z } from 'zod';
-import { askAgent1 } from './askAgent1.js';
+import { askAgent1 } from './ask-agent1.js';
 import { getCryptoPrice } from './get-crypto-price.js';
 
 const PORT = process.env.A1_SERVER_PORT;
