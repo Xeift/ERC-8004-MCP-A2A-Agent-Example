@@ -2,7 +2,7 @@ import 'dotenv/config';
 
 import { writeFileSync } from 'node:fs';
 import { z } from 'zod';
-import { callA2AServer } from './a2a-client.js';
+import { callA2AServer, fetchAgentCard } from './a2a-client.js';
 
 import { Agent, run, RunResult, setDefaultOpenAIClient, setOpenAIAPI, setTracingDisabled, tool } from '@openai/agents';
 import { OpenAI } from 'openai/client.js';
@@ -19,9 +19,18 @@ setDefaultOpenAIClient(
 )
 
 // -----  add custom tool   -----
+const fetchAgentCardTool = tool({
+  name: 'fetch_agent_card',
+  description: 'Fetch A2A Agent Card by providing baseURL. baseURL only contains domain and port(if any).',
+  parameters: z.object({ baseURL: z.string() }),
+  execute: async ({ baseURL }) => {
+    return await fetchAgentCard(baseURL);
+  }
+});
+
 const callA2AServerTool = tool({
   name: 'call_a2a_server',
-  description: 'Call any A2A server by providing baseURL and message.',
+  description: 'Call any A2A server by providing baseURL and message. baseURL only contains domain and port(if any).',
   parameters: z.object({ baseURL: z.string(), message: z.string() }),
   execute: async ({ baseURL, message }) => {
     return await callA2AServer(baseURL, message);
@@ -42,14 +51,16 @@ const agent = new Agent({
   instructions: `
   一律用繁體中文（zh-TW）回覆所有問題。
   你是一位專業的 Web3 研究員，負責產生 Web3 日報給使用者。
-  使用者給定一個主題，你可以使用 A2A 委託 http://localhost:3000/a2a/jsonrpc 的 agent 幫你查詢資料，
+  使用者給定一個主題，你可以使用 A2A 委託 http://localhost:3000 的 agent 幫你查詢資料，
   再根據資料，自己重寫以後產生一份完整的加密日報。
+  先用 fetch_agent_card 取得 Agent Card，再根據 Agent Card 中的 endpoint 用 call_a2a_server。
   你非常喜歡臺灣小吃，所以可以適時用臺灣小吃和譬喻的方式解釋複雜的概念。
   `,
-  model: 'amazon/nova-2-lite-v1:free',
+  // model: 'amazon/nova-2-lite-v1:free',
+  model: 'nvidia/nemotron-3-nano-30b-a3b:free',
   // model: 'openai/gpt-oss-20b:free',
   // model: 'z-ai/glm-4.5-air:free',
-  tools: [callA2AServerTool],
+  tools: [fetchAgentCardTool, callA2AServerTool],
   // mcpServers: [agent2McpServer],
 });
 
