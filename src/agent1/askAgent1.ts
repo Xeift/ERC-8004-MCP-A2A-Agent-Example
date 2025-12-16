@@ -37,7 +37,7 @@ const getBlockNumberTool = tool({
   }
 });
 
-// -----  add mcp server   -----
+// -----  add mcp server  -----
 const tavilyMcpServer = new MCPServerStreamableHttp({
   url: `https://mcp.tavily.com/mcp/?tavilyApiKey=${process.env.TAVILY_API_KEY}`,
   name: 'Tavily MCP Server',
@@ -45,7 +45,7 @@ const tavilyMcpServer = new MCPServerStreamableHttp({
 });
 await tavilyMcpServer.connect();
 
-// -----  create agent   -----
+// -----  create agent  -----
 const agent = new Agent({
   name: 'Assistant',
   instructions: '一律用繁體中文（zh-TW）回覆所有問題。你是一位專業的 Web3 研究員。使用者發問時，先用 tavily_search 工具搜尋，再用 get_crypto_price 工具取得即時幣價資料。',
@@ -54,9 +54,8 @@ const agent = new Agent({
   mcpServers: [tavilyMcpServer],
 });
 
+// -----  print each round message  -----
 function printResult(result: RunResult<any, Agent<any, any>>) {
-  const json = JSON.stringify(result.output, null, 2);
-
   function printJson(input: any): string {
     if (input !== null && typeof input === 'object') {
       return JSON.stringify(input)
@@ -65,7 +64,7 @@ function printResult(result: RunResult<any, Agent<any, any>>) {
   }
 
   result.output.forEach((item: any, index: number) => {
-    console.log(`----------   第 ${index + 1} 輪輸出    ----------`);
+    console.log(`----------  第 ${index + 1} 輪輸出  ----------`);
     let out: string = '';
     if (item.type === 'message') {
       out = `📨［純訊息］\n${printJson(item.content[0].text)}`;
@@ -81,12 +80,12 @@ function printResult(result: RunResult<any, Agent<any, any>>) {
       out = `🟥［其他］\n${printJson(item)}`;
     }
     console.log(out.substring(0, 200));
-    console.log(`----------   第 ${index + 1} 輪輸出    ----------\n`);
+    console.log(`----------  第 ${index + 1} 輪輸出  ----------\n`);
   });
 
-  console.log(`----------   最終輸出    ----------`);
+  console.log(`----------  最終輸出  ----------`);
   console.log(result.finalOutput);
-  console.log(`----------   最終輸出    ----------\n`);
+  console.log(`----------  最終輸出  ----------\n`);
 }
 
 export async function askAgent1(message: string): Promise<string> {
