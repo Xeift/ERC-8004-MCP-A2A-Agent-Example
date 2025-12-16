@@ -56,6 +56,7 @@ const agent = new Agent({
 
 // -----  print each round message  -----
 function printResult(result: RunResult<any, Agent<any, any>>) {
+
   function printJson(input: any): string {
     if (input !== null && typeof input === 'object') {
       return JSON.stringify(input)
@@ -67,13 +68,16 @@ function printResult(result: RunResult<any, Agent<any, any>>) {
     console.log(`----------  第 ${index + 1} 輪輸出  ----------`);
     let out: string = '';
     if (item.type === 'message') {
-      out = `📨［純訊息］\n${printJson(item.content[0].text)}`;
+      out = `✅［模型回覆］\n${printJson(item.content[0].text)}`;
     }
     else if (item.type === `function_call`) {
-      out = `➡️［呼叫工具：${item.name}］\n${printJson(item.arguments)}`;
+      out = `🛠️［呼叫工具：${item.name}］\n${printJson(item.arguments)}`;
     }
     else if (item.type === 'function_call_result') {
-      out = `⬅️［工具回應：${item.name}］\n${printJson(item.output)}`;
+      out = `📩［工具回應：${item.name}］\n${printJson(item.output)}`;
+    }
+    else if (item.type === 'reasoning') {
+      out = `🤔［推理］\n${printJson(item.rawContent[0]['text'])}`;
     }
     else {
       console.log(typeof (item));

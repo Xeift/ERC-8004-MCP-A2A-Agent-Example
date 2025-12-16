@@ -160,9 +160,11 @@ async function main() {
   );
 
   app.listen(PORT, () => {
+    console.log('----------  Agent1 Server Start  ----------');
     console.log(`Start MCP Server on http://localhost:${PORT}/mcp`);
     console.log(`Start A2A Server on http://localhost:${PORT}/a2a/jsonrpc`);
     console.log(`Host A2A Agent Card on http://localhost:${PORT}/${AGENT_CARD_PATH}`);
+    console.log('----------  Agent1 Server Start  ----------\n');
   });
 }
 

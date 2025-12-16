@@ -10,5 +10,6 @@
         "TAVILY",
         "TRAVILY",
         "uuidv"
-    ]
+    ],
+    "chatgpt.commentCodeLensEnabled": false
 }

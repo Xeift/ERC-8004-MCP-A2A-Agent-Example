@@ -7,7 +7,7 @@ import { Agent, run, RunResult, setDefaultOpenAIClient, setOpenAIAPI, setTracing
 import { OpenAI } from 'openai/client.js';
 
 
-// -----  use custom client   -----
+// -----  use custom client  -----
 setOpenAIAPI('chat_completions');
 setTracingDisabled(true);
 setDefaultOpenAIClient(
@@ -17,7 +17,7 @@ setDefaultOpenAIClient(
   })
 )
 
-// -----  add custom tool   -----
+// -----  add custom tool  -----
 const fetchAgentCardTool = tool({
   name: 'fetch_agent_card',
   description: 'Fetch A2A Agent Card by providing baseURL. baseURL only contains scheme, domain and port(if any).',
@@ -36,7 +36,7 @@ const callA2AServerTool = tool({
   }
 });
 
-// -----  add agent2 mcp server   -----
+// -----  add agent2 mcp server  ----
 // const agent2McpServer = new MCPServerStreamableHttp({
 //   url: `http://localhost:${process.env.A2_SERVER_PORT}/mcp`,
 //   name: 'Agent2 MCP Server',
@@ -44,14 +44,14 @@ const callA2AServerTool = tool({
 // });
 // await agent2McpServer.connect();
 
-// -----  create agent   -----
+// -----  create agent  -----
 const agent = new Agent({
   name: 'Assistant',
   instructions: `
   一律用繁體中文（zh-TW）回覆所有問題。
-  你是一位專業的 Web3 研究員，負責產生 Web3 日報給使用者。
-  使用者給定一個主題，你可以使用 A2A 委託 http://localhost:3000 的 agent 幫你查詢資料，
-  再根據資料，自己重寫以後產生一份完整的加密日報。
+  你是一位專業的 Web3 研究員，使用者給定一個主題，你負責產生 Web3 日報給使用者。
+  你可以使用 A2A 委託 http://localhost:3000 的 agent 幫你查詢資料，
+  再根據其資料，自己重寫以後產生一份完整的加密日報。
   先用 fetch_agent_card 取得 Agent Card，再根據 Agent Card 中的 endpoint 用 call_a2a_server。
   你非常喜歡臺灣小吃，所以可以適時用臺灣小吃和譬喻的方式解釋複雜的概念。
   `,
@@ -66,6 +66,7 @@ const result = await run(
 );
 printResult(result);
 
+// -----  print each round message  -----
 function printResult(result: RunResult<any, Agent<any, any>>) {
 
   function printJson(input: any): string {
@@ -76,7 +77,7 @@ function printResult(result: RunResult<any, Agent<any, any>>) {
   }
 
   result.output.forEach((item: any, index: number) => {
-    console.log(`----------   第 ${index + 1} 輪輸出    ----------`);
+    console.log(`----------  第 ${index + 1} 輪輸出  ----------`);
     let out: string = '';
     if (item.type === 'message') {
       out = `✅［模型回覆］\n${printJson(item.content[0].text)}`;
@@ -95,10 +96,10 @@ function printResult(result: RunResult<any, Agent<any, any>>) {
       out = `🟥［其他］\n${printJson(item)}`;
     }
     console.log(out.substring(0, 200));
-    console.log(`----------   第 ${index + 1} 輪輸出    ----------\n`);
+    console.log(`----------  第 ${index + 1} 輪輸出  ----------\n`);
   });
 
-  console.log(`----------   最終輸出    ----------`);
+  console.log(`----------  最終輸出  ----------`);
   console.log(result.finalOutput);
-  console.log(`----------   最終輸出    ----------\n`);
+  console.log(`----------  最終輸出  ----------\n`);
 }
