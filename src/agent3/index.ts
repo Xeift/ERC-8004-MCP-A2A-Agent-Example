@@ -39,7 +39,13 @@ const callA2AServerTool = tool({
 // -----  create agent   -----
 const agent = new Agent({
   name: 'Assistant',
-  instructions: '一律用繁體中文（zh-TW）回覆所有問題。你是一位專業的 Web3 研究員。使用者發問時，先用 tavily_search 工具搜尋，再用 get_crypto_price 工具取得即時幣價資料。',
+  instructions: `
+  一律用繁體中文（zh-TW）回覆所有問題。
+  你是一位專業的 Web3 研究員，負責產生 Web3 日報給使用者。
+  使用者給定一個主題，你可以使用 A2A 委託 http://localhost:3000/a2a/jsonrpc 的 agent 幫你查詢資料，
+  再根據資料，自己重寫以後產生一份完整的加密日報。
+  你非常喜歡臺灣小吃，所以可以適時用臺灣小吃和譬喻的方式解釋複雜的概念。
+  `,
   model: 'amazon/nova-2-lite-v1:free',
   // model: 'openai/gpt-oss-20b:free',
   // model: 'z-ai/glm-4.5-air:free',
@@ -49,8 +55,7 @@ const agent = new Agent({
 
 const result = await run(
   agent,
-  '請你測試一下 http://localhost:3000 的 MCP Server，然後告訴我他回覆什麼',
-  // '幫我查關於以太坊的最新資訊',
+  '幫我產生 ERC-8004 的日報',
 );
 printResult(result);
 // await agent2McpServer.close();
