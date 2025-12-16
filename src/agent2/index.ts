@@ -2,7 +2,7 @@ import 'dotenv/config';
 
 import { writeFileSync } from 'node:fs';
 import { z } from 'zod';
-import { getBlockNumber } from './get-block-number.js';
+// import { getBlockNumber } from './get-block-number.js';
 
 import { Agent, MCPServerStreamableHttp, run, RunResult, setDefaultOpenAIClient, setOpenAIAPI, setTracingDisabled, tool } from '@openai/agents';
 import { OpenAI } from 'openai/client.js';
@@ -23,7 +23,7 @@ const getBlockNumberTool = tool({
   description: 'Get the latest Ethereum mainnet block number.',
   parameters: z.object({}),
   execute: async () => {
-    return await getBlockNumber();
+    // return await getBlockNumber();
   }
 });
 
@@ -48,7 +48,7 @@ const agent = new Agent({
   name: 'Assistant',
   instructions: '使用繁體中文（zh-TW）回覆所有問題。',
   model: 'amazon/nova-2-lite-v1:free',
-  tools: [getBlockNumberTool],
+  // tools: [getBlockNumberTool],
   mcpServers: [tavilyMcpServer, agent1McpServer],
 });
 

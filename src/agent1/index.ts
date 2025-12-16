@@ -6,6 +6,7 @@ import { getCryptoPrice } from './get-crypto-price.js';
 
 import { Agent, MCPServerStreamableHttp, run, RunResult, setDefaultOpenAIClient, setOpenAIAPI, setTracingDisabled, tool } from '@openai/agents';
 import { OpenAI } from 'openai/client.js';
+import { getBlockNumber } from './get-block-number.js';
 
 
 // -----  use custom client   -----
@@ -28,6 +29,15 @@ const getCryptoPriceTool = tool({
   }
 });
 
+const getBlockNumberTool = tool({
+  name: 'get_block_number',
+  description: 'Get the latest Ethereum mainnet block number.',
+  parameters: z.object({}),
+  execute: async () => {
+    return await getBlockNumber();
+  }
+});
+
 // -----  add mcp server   -----
 const tavilyMcpServer = new MCPServerStreamableHttp({
   url: `https://mcp.tavily.com/mcp/?tavilyApiKey=${process.env.TAVILY_API_KEY}`,
@@ -36,14 +46,6 @@ const tavilyMcpServer = new MCPServerStreamableHttp({
 });
 await tavilyMcpServer.connect();
 
-// -----  add agent2 mcp server   -----
-const agent2McpServer = new MCPServerStreamableHttp({
-  url: `http://localhost:${process.env.A2_SERVER_PORT}/mcp`,
-  name: 'Agent2 MCP Server',
-  cacheToolsList: true,
-});
-await agent2McpServer.connect();
-
 // -----  create agent   -----
 const agent = new Agent({
   name: 'Assistant',
@@ -51,17 +53,9 @@ const agent = new Agent({
   model: 'amazon/nova-2-lite-v1:free',
   // model: 'openai/gpt-oss-20b:free',
   // model: 'z-ai/glm-4.5-air:free',
-  tools: [getCryptoPriceTool],
-  mcpServers: [tavilyMcpServer, agent2McpServer],
+  tools: [getCryptoPriceTool, getBlockNumberTool],
+  mcpServers: [tavilyMcpServer],
 });
-
-const result = await run(
-  agent,
-  '幫我查關於以太坊的最新資訊',
-);
-printResult(result);
-await tavilyMcpServer.close();
-await agent2McpServer.close();
 
 function printResult(result: RunResult<any, Agent<any, any>>) {
   const json = JSON.stringify(result.output, null, 2);
@@ -98,3 +92,10 @@ function printResult(result: RunResult<any, Agent<any, any>>) {
   console.log(result.finalOutput);
   console.log(`----------   最終輸出    ----------\n`);
 }
+
+const result = await run(
+  agent,
+  '幫我查關於以太坊的最新資訊和即時鏈上數據',
+);
+printResult(result);
+await tavilyMcpServer.close();

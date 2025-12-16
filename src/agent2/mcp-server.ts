@@ -3,7 +3,7 @@ import 'dotenv/config';
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { StreamableHTTPServerTransport } from '@modelcontextprotocol/sdk/server/streamableHttp.js';
 import express, { type Request, type Response } from 'express';
-import { getBlockNumber } from './get-block-number.js';
+// import { getBlockNumber } from './get-block-number.js';
 
 async function main() {
   // -----  create mpc server   -----
@@ -13,26 +13,26 @@ async function main() {
   });
 
   // -----  register available tool to mpc server   -----
-  mcpServer.registerTool(
-    'get_block_number',
-    {
-      title: 'Get block number',
-      description: 'Get the current Ethereum block number in hex and dec.',
-      inputSchema: {},
-    },
-    async () => {
-      const data = await getBlockNumber(); // call actual tool
-      return {
-        content: [
-          {
-            type: 'text',
-            text: JSON.stringify(data),
-          },
-        ],
-        structuredContent: data,
-      };
-    },
-  );
+  // mcpServer.registerTool(
+  //   'get_block_number',
+  //   {
+  //     title: 'Get block number',
+  //     description: 'Get the current Ethereum block number in hex and dec.',
+  //     inputSchema: {},
+  //   },
+  //   async () => {
+  //     const data = await getBlockNumber(); // call actual tool
+  //     return {
+  //       content: [
+  //         {
+  //           type: 'text',
+  //           text: JSON.stringify(data),
+  //         },
+  //       ],
+  //       structuredContent: data,
+  //     };
+  //   },
+  // );
 
   // -----  convert http <-> mcp   -----
   const transport = new StreamableHTTPServerTransport({
