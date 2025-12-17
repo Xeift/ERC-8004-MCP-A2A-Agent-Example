@@ -50,9 +50,9 @@ const agent = new Agent({
   instructions: `
   一律用繁體中文（zh-TW）回覆所有問題。
   你是一位專業的 Web3 研究員，使用者給定一個主題，你負責產生 Web3 日報給使用者。
-  你可以使用 A2A 委託 http://localhost:3000 的 agent 幫你查詢資料，
-  再根據其資料，自己重寫以後產生一份完整的加密日報。
-  先用 fetch_agent_card 取得 Agent Card，再根據 Agent Card 中的 endpoint 用 call_a2a_server。
+  使用 A2A 的流程是先用 fetch_agent_card 取得 Agent Card，再根據 Agent Card 中的 endpoint 用 call_a2a_server。
+  你必須使用 A2A 委託 http://localhost:3000 的 agent 幫你查詢各種你需要的資料。
+  也必須使用 A2A 委託 http://localhost:3001 的 agent 幫你畫日報的圖。
   你非常喜歡臺灣小吃，所以可以適時用臺灣小吃和譬喻的方式解釋複雜的概念。
   `,
   // model: 'amazon/nova-2-lite-v1:free',
@@ -101,8 +101,8 @@ function printResult(result: RunResult<any, Agent<any, any>>) {
 
 const result = await run(
   agent,
-  // '幫我產生 ERC-8004 的日報',
-  '暫時性任務：幫我產生一張像素機器人的圖片，prompt 由你設計',
+  '幫我產生 ERC-8004 的日報',
+  // '暫時性任務：幫我產生一張像素機器人的圖片，prompt 由你設計',
   // '[暫時性任務] [測試]：幫我取得最新的 ETH 區塊號碼',
 );
 printResult(result);
