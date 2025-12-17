@@ -1,8 +1,3 @@
-import 'dotenv/config';
-
-
-const INFURA_URL = `https://mainnet.infura.io/v3/${process.env.INFURA_API_KEY}`;
-
 export async function getBlockNumber() {
   const body = {
     jsonrpc: "2.0",
@@ -11,7 +6,7 @@ export async function getBlockNumber() {
     id: 1
   };
 
-  const res = await fetch(INFURA_URL, {
+  const res = await fetch('https://eth.llamarpc.com', {
     method: "POST",
     headers: {
       "Content-Type": "application/json"
