@@ -9,6 +9,7 @@ import express, { type Request, type Response } from 'express';
 import { v4 as uuidv4 } from 'uuid';
 import { z } from 'zod';
 import { askAgent1 } from './ask-agent1.js';
+import { getBlockNumber } from './get-block-number.js';
 import { getCryptoPrice } from './get-crypto-price.js';
 
 const PORT = process.env.A1_SERVER_PORT;
@@ -49,6 +50,28 @@ async function main() {
       };
     },
   );
+
+  mcpServer.registerTool(
+    'get_eth_block_number',
+    {
+      title: 'Get Ethereum latest block number',
+      description: 'Get the latest Ethereum block number using JSON-RPC eth_blockNumber.',
+      inputSchema: {},
+    },
+    async () => {
+      const data = await getBlockNumber(); // call actual tool
+      return {
+        content: [
+          {
+            type: 'text',
+            text: JSON.stringify(data),
+          },
+        ],
+        structuredContent: data,
+      };
+    },
+  );
+
 
   // -----  convert http <-> mcp  -----
   const transport = new StreamableHTTPServerTransport({
@@ -98,23 +121,31 @@ async function main() {
 
   // -----  add a2a agent card  -----
   const agentCard: AgentCard = {
-    name: 'Crypto Price Agent',
-    description: 'An crypto price agent returns crypto price in USD. Powered by Coingecko API. Supports ERC-8004, MCP, A2A.',
+    name: 'Crypto Data Agent',
+    description:
+      'A crypto data agent that provides cryptocurrency prices in USD and retrieves the latest Ethereum block number. Powered by Coingecko API and Ethereum RPC. Supports ERC-8004, MCP, and A2A.',
     protocolVersion: '0.3.0',
-    version: '1.0.0',
+    version: '1.1.0',
     url: `http://localhost:${PORT}/a2a/jsonrpc`,
     skills: [
       {
         id: 'get_crypto_price',
         name: 'Get Crypto Price',
-        description: "Provide token symbols like 'BTC,ETH'.",
+        description: "Provide token symbols like 'BTC,ETH' to retrieve prices in USD.",
         tags: ['crypto', 'price'],
+      },
+      {
+        id: 'get_latest_ethereum_block',
+        name: 'Get Latest Ethereum Block Number',
+        description: 'Retrieve the latest block number from the Ethereum network.',
+        tags: ['ethereum', 'block', 'rpc'],
       },
     ],
     capabilities: { pushNotifications: false },
     defaultInputModes: ['text'],
     defaultOutputModes: ['text'],
   }
+
 
   // -----  add a2a request handler to deal with http request  -----
   const a2aRequestHandler = new DefaultRequestHandler(
