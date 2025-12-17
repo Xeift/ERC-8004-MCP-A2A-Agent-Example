@@ -25,8 +25,14 @@ async function main() {
       },
     },
     async ({ prompt }) => {
+      console.log('----------  server: received remote request  ----------');
+      console.log(`generating image, prompt:\n${prompt}`);
+      console.log('----------  server: received remote request  ----------\n');
       const imgBase64 = await generateImage(prompt); // call actual tool
       const imgURL = await uploadImgbb(imgBase64);
+      console.log('----------  server: done  ----------');
+      console.log(`generated image link: ${imgURL}`);
+      console.log('----------  server: done  ----------\n');
       return {
         content: [
           {
@@ -65,7 +71,9 @@ async function main() {
 
   const PORT = process.env.A2_SERVER_PORT;
   app.listen(PORT, () => {
-    console.log(`listening on http://localhost:${PORT}/mcp`);
+    console.log('----------  Agent2 Server Start  ----------');
+    console.log(`Start MCP Server on http://localhost:${PORT}/mcp`);
+    console.log('----------  Agent2 Server Start  ----------\n');
   });
 }
 

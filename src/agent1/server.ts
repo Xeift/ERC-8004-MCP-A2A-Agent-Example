@@ -98,9 +98,9 @@ async function main() {
           break;
         }
       }
-      console.log('----------  server: 收到遠端訊息  ----------');
-      console.log(userText);
-      console.log('----------  server: 收到遠端訊息  ----------\n');
+      console.log('----------  server: received remote request  ----------');
+      console.log(`user message: ${userText}`);
+      console.log('----------  server: received remote request  ----------\n');
 
       const response = await askAgent1(userText);
 
