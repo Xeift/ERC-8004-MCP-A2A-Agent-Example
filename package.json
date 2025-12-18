@@ -8,7 +8,10 @@
     "build": "tsc -p .",
     "server:a1": "npm run build && node dist/agent1/server.js",
     "server:a2": "npm run build && node dist/agent2/server.js",
-    "agent:a3": "npm run build && node dist/agent3/index.js"
+    "agent:a3": "npm run build && node dist/agent3/index.js",
+    "register:a1": "npm run build && node dist/erc-8004/register-agent1.js",
+    "register:a2": "npm run build && node dist/erc-8004/register-agent2.js",
+    "register:a3": "npm run build && node dist/erc-8004/register-agent3.js"
   },
   "keywords": [],
   "author": "",
@@ -18,6 +21,7 @@
     "@a2a-js/sdk": "^0.3.6",
     "@modelcontextprotocol/sdk": "^1.24.3",
     "@openai/agents": "^0.3.4",
+    "agent0-sdk": "file:agent0-sdk-0.31.0-patched.tgz",
     "dotenv": "^17.2.3",
     "express": "^5.2.1",
     "openai": "^6.10.0",

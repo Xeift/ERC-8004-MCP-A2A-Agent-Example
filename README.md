@@ -3,9 +3,10 @@
 
 # Quickstart
 ## 1. Install dependencies
+```console
+npm i --ignore-scripts
 ```
-npm i
-```
+Important: If you do not pass `--ignore-scripts` flag, you'll encounter an error about `codegen.yml`.
 ## 2. Add .env
 ```
 cp .env.example .env
