@@ -16,7 +16,7 @@ const sdk = new SDK({
 const agent = sdk.createAgent(
     'Crypto Data Agent',
     'A crypto data agent that provides cryptocurrency prices in USD and retrieves the latest Ethereum block number. Powered by Coingecko API and Ethereum RPC. Supports ERC-8004, MCP, and A2A.',
-    'https://i.ibb.co/Z6KMXV3c/agent1.png'
+    'https://raw.githubusercontent.com/Xeift/ERC-8004-MCP-A2A-Agent-Example/refs/heads/develop/src/agent1/agent1_pfp.png'
 );
 
 // Configure endpoints (automatically extracts capabilities)
