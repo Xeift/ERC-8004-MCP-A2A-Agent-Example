@@ -1,6 +1,7 @@
 import 'dotenv/config';
 
 import { SDK } from 'agent0-sdk';
+import { saveAgentId } from './save-agent-id.js';
 
 // Initialize SDK with IPFS and subgraph
 const sdk = new SDK({
@@ -62,4 +63,6 @@ console.log(`Agent URI: ${registrationFile.agentURI?.replace(
     'ipfs://',
     'https://ipfs.io/ipfs/'
 )}`);
+saveAgentId('agent3', registrationFile.agentId!)
+console.log('AgentId has been saved to agent-id.json');
 console.log('----------  Agent3 Registered  ----------');
