@@ -11,6 +11,10 @@ import { getAgentId } from '../erc-8004/agent-id-manager.js';
 const agentId = getAgentId('agent3');
 if (!agentId) throw new Error('Though it\'s not required to register as an ERC-8004 agent to give feedback, in this example we use `register:a3` first to register the agent on chain.')
 
+console.log('----------  Logged in as Agent3  ----------');
+console.log(`ERC-8004 Identity Registry agentId: ${agentId}`);
+console.log('----------  Logged in as Agent3  ----------\n');
+
 // -----  use custom client  -----
 setOpenAIAPI('chat_completions');
 setTracingDisabled(true);
