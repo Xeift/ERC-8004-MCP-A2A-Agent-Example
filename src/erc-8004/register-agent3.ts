@@ -1,7 +1,7 @@
 import 'dotenv/config';
 
 import { SDK } from 'agent0-sdk';
-import { saveAgentId } from './save-agent-id.js';
+import { saveAgentId } from './agent-id-manager.js';
 
 // Initialize SDK with IPFS and subgraph
 const sdk = new SDK({

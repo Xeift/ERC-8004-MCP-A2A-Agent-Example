@@ -8,6 +8,7 @@ import { StreamableHTTPServerTransport } from '@modelcontextprotocol/sdk/server/
 import express, { type Request, type Response } from 'express';
 import { v4 as uuidv4 } from 'uuid';
 import { z } from 'zod';
+import { getAgentId } from '../erc-8004/agent-id-manager.js';
 import { askAgent1 } from './ask-agent1.js';
 import { getBlockNumber } from './get-block-number.js';
 import { getCryptoPrice } from './get-crypto-price.js';
@@ -15,6 +16,9 @@ import { getCryptoPrice } from './get-crypto-price.js';
 const PORT = process.env.A1_SERVER_PORT;
 
 async function main() {
+  const agentId = getAgentId('agent1');
+  if (!agentId) throw new Error('In order to accept feedback from client agent, it\'s required to use `register:a1` first to register the agent on chain!')
+
   // ========================================
   // ========================================
   //                    MCP
@@ -192,6 +196,7 @@ async function main() {
 
   app.listen(PORT, () => {
     console.log('----------  Agent1 Server Start  ----------');
+    console.log(`ERC-8004 Identity Registry agentId: ${agentId}`);
     console.log(`Start MCP Server on http://localhost:${PORT}/mcp`);
     console.log(`Start A2A Server on http://localhost:${PORT}/a2a/jsonrpc`);
     console.log(`Host A2A Agent Card on http://localhost:${PORT}/${AGENT_CARD_PATH}`);

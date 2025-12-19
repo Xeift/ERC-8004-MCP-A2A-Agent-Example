@@ -4,10 +4,14 @@ import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { StreamableHTTPServerTransport } from '@modelcontextprotocol/sdk/server/streamableHttp.js';
 import express, { type Request, type Response } from 'express';
 import { z } from 'zod';
+import { getAgentId } from '../erc-8004/agent-id-manager.js';
 import { generateImage } from './generate-image.js';
 import { uploadImgbb } from './upload-imgbb.js';
 
 async function main() {
+  const agentId = getAgentId('agent2');
+  if (!agentId) throw new Error('In order to accept feedback from client agent, it\'s required to use `register:a2` first to register the agent on chain!')
+
   // -----  create mpc server  -----
   const mcpServer = new McpServer({
     name: 'generate-image-mcp',
@@ -72,6 +76,7 @@ async function main() {
   const PORT = process.env.A2_SERVER_PORT;
   app.listen(PORT, () => {
     console.log('----------  Agent2 Server Start  ----------');
+    console.log(`ERC-8004 Identity Registry agentId: ${agentId}`);
     console.log(`Start MCP Server on http://localhost:${PORT}/mcp`);
     console.log('----------  Agent2 Server Start  ----------\n');
   });

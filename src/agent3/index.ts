@@ -5,7 +5,11 @@ import { callA2AServer, fetchAgentCard } from './a2a-client.js';
 
 import { Agent, MCPServerStreamableHttp, run, RunResult, setDefaultOpenAIClient, setOpenAIAPI, setTracingDisabled, tool } from '@openai/agents';
 import { OpenAI } from 'openai/client.js';
+import { getAgentId } from '../erc-8004/agent-id-manager.js';
 
+
+const agentId = getAgentId('agent3');
+if (!agentId) throw new Error('Though it\'s not required to register as an ERC-8004 agent to give feedback, in this example we use `register:a3` first to register the agent on chain.')
 
 // -----  use custom client  -----
 setOpenAIAPI('chat_completions');
