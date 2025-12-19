@@ -5,7 +5,7 @@ import { saveAgentId } from './agent-id-manager.js';
 
 // Initialize SDK with IPFS and subgraph
 const sdk = new SDK({
-    chainId: 11155111,
+    chainId: Number(process.env.CHAIN_ID),
     rpcUrl: 'https://ethereum-sepolia-public.nodies.app',
     signer: process.env.A3_PRIVATE_KEY!,
     ipfs: 'pinata',
@@ -48,7 +48,7 @@ agent.addDomain('technology/software_engineering/apis_integration', true);
 agent.addDomain('technology/automation/workflow_automation', true);
 
 // Configure wallet and trust
-agent.setAgentWallet(process.env.A3_ADDRESS!, 11155111);
+agent.setAgentWallet(process.env.A3_ADDRESS!, Number(process.env.CHAIN_ID));
 agent.setTrust(true, false, false); // reputation, cryptoEconomic, teeAttestation
 
 // Add metadata and set status

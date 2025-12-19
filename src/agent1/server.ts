@@ -7,6 +7,7 @@ import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { StreamableHTTPServerTransport } from '@modelcontextprotocol/sdk/server/streamableHttp.js';
 import express, { type Request, type Response } from 'express';
 import { v4 as uuidv4 } from 'uuid';
+import { paymentMiddleware, type Resource } from 'x402-express';
 import { z } from 'zod';
 import { getAgentId } from '../erc-8004/agent-id-manager.js';
 import { askAgent1 } from './ask-agent1.js';
@@ -167,6 +168,20 @@ async function main() {
   // -----  create http server using express  -----
   const app = express();
   app.use(express.json());
+  app.use(
+    paymentMiddleware(
+      process.env.A1_ADDRESS as `0x${string}`,
+      {
+        'GET /mcp': {
+          price: '$0.002',
+          network: 'base-sepolia',
+        },
+      },
+      {
+        url: process.env.FACILITATOR_URL as Resource,
+      },
+    ),
+  );
 
   // -----  add mcp endpoint  -----
   app.post('/mcp', async (req: Request, res: Response) => {
