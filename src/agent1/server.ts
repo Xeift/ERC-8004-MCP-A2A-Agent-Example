@@ -169,6 +169,7 @@ async function main() {
   // -----  create http server using express, integrate x402 middleware  -----
   const app = express();
   app.use(express.json());
+
   const mcpPayment = paymentMiddleware(
     process.env.A1_ADDRESS as `0x${string}`,
     {
@@ -188,7 +189,7 @@ async function main() {
       return mcpPayment(req, res, next);
     }
     return next();
-  }), async (req: Request, res: Response) => {
+  }, async (req: Request, res: Response) => {
     try {
       await transport.handleRequest(req, res, req.body); // use transport to convert mcp <-> http
     } catch (error) {
@@ -201,16 +202,28 @@ async function main() {
         });
       }
     }
-  }
+  });
+
+  const a2aPayment = paymentMiddleware(
+    process.env.A1_ADDRESS as `0x${string}`,
+    {
+      'POST /a2a/jsonrpc': { price: '$0.002', network },
+    },
+    { url: process.env.FACILITATOR_URL as Resource },
+  );
 
   // -----  add a2a endpoint  -----
   app.use(`/${AGENT_CARD_PATH}`, agentCardHandler({ agentCardProvider: a2aRequestHandler }));
+  app.post('/a2a/jsonrpc', (req, res, next) => {
+    const m = req.body?.method;
+    if (m === 'message/send' || m === 'message/stream' || m === 'tasks/resubscribe') {  // only charge when task or normal message
+      return a2aPayment(req, res, next);
+    }
+    return next();
+  });
   app.use(
     '/a2a/jsonrpc',
-    jsonRpcHandler({
-      requestHandler: a2aRequestHandler,
-      userBuilder: UserBuilder.noAuthentication,
-    }),
+    jsonRpcHandler({ requestHandler: a2aRequestHandler, userBuilder: UserBuilder.noAuthentication }),
   );
 
   app.listen(PORT, () => {

@@ -49,7 +49,7 @@ await tavilyMcpServer.connect();
 const agent = new Agent({
   name: 'Assistant',
   instructions: '一律用繁體中文（zh-TW）回覆所有問題。你是一位專業的 Web3 研究員。使用者發問時，先用 tavily_search 工具搜尋，再用 get_crypto_price 工具取得即時幣價資料。',
-  model: 'amazon/nova-2-lite-v1:free',
+  model: 'openai/gpt-oss-20b:free',
   tools: [getCryptoPriceTool, getBlockNumberTool],
   mcpServers: [tavilyMcpServer],
 });

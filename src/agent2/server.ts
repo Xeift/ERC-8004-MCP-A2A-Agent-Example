@@ -60,6 +60,7 @@ async function main() {
   // -----  create http server using express, integrate x402 middleware  -----
   const app = express();
   app.use(express.json());
+
   const mcpPayment = paymentMiddleware(
     process.env.A2_ADDRESS as `0x${string}`,
     {

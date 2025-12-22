@@ -1,7 +1,7 @@
 import 'dotenv/config';
 import { createSigner, wrapFetchWithPayment } from 'x402-fetch';
 
-type FetchLike = (input: string | URL, init?: RequestInit) => Promise<Response>;
+type FetchLike = typeof fetch;
 let fetchWithPayment: FetchLike | null = null;
 
 // prevent 406 error: Not Acceptable: Client must accept both application/json and text/event-stream

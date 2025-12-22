@@ -117,8 +117,8 @@ function printResult(result: RunResult<any, Agent<any, any>>) {
 
 const result = await run(
   agent,
-  // '幫我產生 ERC-8004 的日報',
-  '暫時性任務：幫我產生一張像素機器人的圖片，prompt 由你設計',
+  '幫我產生 ERC-8004 的日報',
+  // '暫時性任務：幫我產生一張像素機器人的圖片，prompt 由你設計',
   // '[暫時性任務] [測試]：幫我取得最新的 ETH 區塊號碼',
 );
 printResult(result);
