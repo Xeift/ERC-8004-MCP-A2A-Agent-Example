@@ -6,10 +6,14 @@ import { callA2AServer, fetchAgentCard } from './a2a-client.js';
 import { Agent, MCPServerStreamableHttp, run, RunResult, setDefaultOpenAIClient, setOpenAIAPI, setTracingDisabled, tool } from '@openai/agents';
 import { OpenAI } from 'openai/client.js';
 import { getAgentId } from '../erc-8004/agent-id-manager.js';
+import { x402Fetch } from './x402-fetch.js';
 
 
 const agentId = getAgentId('agent3');
 if (!agentId) throw new Error('Though it\'s not required to register as an ERC-8004 agent to give feedback, in this example we use `register:a3` first to register the agent on chain.')
+
+const privateKey = process.env.A3_PRIVATE_KEY;
+if (!privateKey) throw new Error('Missing A3_PRIVATE_KEY in .env');
 
 console.log('----------  Logged in as Agent3  ----------');
 console.log(`ERC-8004 Identity Registry agentId: ${agentId}`);
@@ -45,8 +49,11 @@ const callA2AServerTool = tool({
 });
 
 // -----  add agent2 mcp server  ----
+const url = `http://localhost:${process.env.A2_SERVER_PORT}/mcp`;
+const paidFetch = await x402Fetch(privateKey);
 const agent2McpServer = new MCPServerStreamableHttp({
-  url: `http://localhost:${process.env.A2_SERVER_PORT}/mcp`,
+  url,
+  fetch: paidFetch, // integrate x402
   name: 'Agent2 MCP Server',
   cacheToolsList: false,
 });
@@ -110,8 +117,8 @@ function printResult(result: RunResult<any, Agent<any, any>>) {
 
 const result = await run(
   agent,
-  '幫我產生 ERC-8004 的日報',
-  // '暫時性任務：幫我產生一張像素機器人的圖片，prompt 由你設計',
+  // '幫我產生 ERC-8004 的日報',
+  '暫時性任務：幫我產生一張像素機器人的圖片，prompt 由你設計',
   // '[暫時性任務] [測試]：幫我取得最新的 ETH 區塊號碼',
 );
 printResult(result);

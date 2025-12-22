@@ -8,6 +8,7 @@ import { StreamableHTTPServerTransport } from '@modelcontextprotocol/sdk/server/
 import express, { type Request, type Response } from 'express';
 import { v4 as uuidv4 } from 'uuid';
 import { paymentMiddleware, type Resource } from 'x402-express';
+import { NetworkSchema } from 'x402/types';
 import { z } from 'zod';
 import { getAgentId } from '../erc-8004/agent-id-manager.js';
 import { askAgent1 } from './ask-agent1.js';
@@ -19,6 +20,7 @@ const PORT = process.env.A1_SERVER_PORT;
 async function main() {
   const agentId = getAgentId('agent1');
   if (!agentId) throw new Error('In order to accept feedback from client agent, it\'s required to use `register:a1` first to register the agent on chain!')
+  const network = NetworkSchema.parse(process.env.CHAIN_NAME);
 
   // ========================================
   // ========================================
@@ -76,7 +78,6 @@ async function main() {
       };
     },
   );
-
 
   // -----  convert http <-> mcp  -----
   const transport = new StreamableHTTPServerTransport({
@@ -165,26 +166,29 @@ async function main() {
   // ========================================
   // ========================================
 
-  // -----  create http server using express  -----
+  // -----  create http server using express, integrate x402 middleware  -----
   const app = express();
   app.use(express.json());
-  app.use(
-    paymentMiddleware(
-      process.env.A1_ADDRESS as `0x${string}`,
-      {
-        'GET /mcp': {
-          price: '$0.002',
-          network: 'base-sepolia',
-        },
+  const mcpPayment = paymentMiddleware(
+    process.env.A1_ADDRESS as `0x${string}`,
+    {
+      'POST /mcp': {
+        price: '$0.002',
+        network: network,
       },
-      {
-        url: process.env.FACILITATOR_URL as Resource,
-      },
-    ),
+    },
+    {
+      url: process.env.FACILITATOR_URL as Resource,
+    },
   );
 
   // -----  add mcp endpoint  -----
-  app.post('/mcp', async (req: Request, res: Response) => {
+  app.post('/mcp', async (req: Request, res: Response, next) => {
+    if (req.body?.method === 'tools/call') { // only charge when tool call (prevent charge on connect ：( )
+      return mcpPayment(req, res, next);
+    }
+    return next();
+  }), async (req: Request, res: Response) => {
     try {
       await transport.handleRequest(req, res, req.body); // use transport to convert mcp <-> http
     } catch (error) {
@@ -197,7 +201,7 @@ async function main() {
         });
       }
     }
-  });
+  }
 
   // -----  add a2a endpoint  -----
   app.use(`/${AGENT_CARD_PATH}`, agentCardHandler({ agentCardProvider: a2aRequestHandler }));
