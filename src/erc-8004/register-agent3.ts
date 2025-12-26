@@ -6,7 +6,7 @@ import { saveAgentId } from './agent-id-manager.js';
 // Initialize SDK with IPFS and subgraph
 const sdk = new SDK({
     chainId: Number(process.env.CHAIN_ID),
-    rpcUrl: 'https://ethereum-sepolia-public.nodies.app',
+    rpcUrl: process.env.RPC_URL!,
     signer: process.env.A3_PRIVATE_KEY!,
     ipfs: 'pinata',
     pinataJwt: process.env.PINATA_JWT!,
