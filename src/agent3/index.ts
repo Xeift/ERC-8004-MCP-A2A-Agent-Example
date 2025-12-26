@@ -71,7 +71,6 @@ const agent = new Agent({
   儘量避免生成的圖中出現文字。
   你非常喜歡臺灣小吃，所以可以適時用臺灣小吃和譬喻的方式解釋複雜的概念。
   `,
-  // model: 'amazon/nova-2-lite-v1:free',
   model: 'nvidia/nemotron-3-nano-30b-a3b:free',
   tools: [fetchAgentCardTool, callA2AServerTool],
   mcpServers: [agent2McpServer]
