@@ -116,9 +116,9 @@ function printResult(result: RunResult<any, Agent<any, any>>) {
 
 const result = await run(
   agent,
-  '幫我產生 ERC-8004 的日報',
-  // '暫時性任務：幫我產生一張像素機器人的圖片，prompt 由你設計',
-  // '[暫時性任務] [測試]：幫我取得最新的 ETH 區塊號碼',
+  // '幫我產生 ERC-8004 的日報',
+  // '[暫時性任務] 幫我產生一張像素機器人的圖片，prompt 由你設計。feedbackAuth 請你暫時印出來就好，不需要特別做處理。',
+  '[暫時性任務] 幫我取得最新的以太坊區塊號碼。feedbackAuth 請你暫時印出來就好，不需要特別做處理。',
 );
 printResult(result);
 await agent2McpServer.close();

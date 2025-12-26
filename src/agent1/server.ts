@@ -1,21 +1,54 @@
 import 'dotenv/config';
 
 import { AGENT_CARD_PATH, type AgentCard, type Message, type TextPart } from '@a2a-js/sdk';
-import { DefaultRequestHandler, InMemoryTaskStore, type AgentExecutor, type ExecutionEventBus, type RequestContext } from '@a2a-js/sdk/server';
+import { DefaultRequestHandler, InMemoryTaskStore, type AgentExecutor, type ExecutionEventBus, type RequestContext as A2ARequestContext } from '@a2a-js/sdk/server';
 import { agentCardHandler, jsonRpcHandler, UserBuilder } from '@a2a-js/sdk/server/express';
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { StreamableHTTPServerTransport } from '@modelcontextprotocol/sdk/server/streamableHttp.js';
+import { AsyncLocalStorage } from 'async_hooks';
 import express, { type Request, type Response } from 'express';
 import { v4 as uuidv4 } from 'uuid';
 import { paymentMiddleware, type Resource } from 'x402-express';
 import { NetworkSchema } from 'x402/types';
 import { z } from 'zod';
 import { getAgentId } from '../erc-8004/agent-id-manager.js';
+import { FeedbackManager } from '../erc-8004/feedbackManager.js';
 import { askAgent1 } from './ask-agent1.js';
 import { getBlockNumber } from './get-block-number.js';
 import { getCryptoPrice } from './get-crypto-price.js';
 
 const PORT = process.env.A1_SERVER_PORT;
+
+type McpRequestContext = {
+  payerAddress?: string;
+};
+
+const mcpRequestContext = new AsyncLocalStorage<McpRequestContext>();
+
+function tryDecodePaymentHeaderToJson(headerValue: string): any | undefined {
+  const encodings: Array<BufferEncoding> = ['base64', 'base64url'];
+
+  for (const enc of encodings) {
+    try {
+      const raw = Buffer.from(headerValue, enc).toString('utf8');
+      return JSON.parse(raw);
+    } catch {
+    }
+  }
+  return undefined;
+}
+
+function getPayerAddressFromX402Header(req: Request): string | undefined {
+  // v2: PAYMENT-SIGNATURE, v1: X-PAYMENT
+  const headerValue = req.get('PAYMENT-SIGNATURE') ?? req.get('X-PAYMENT');
+  if (!headerValue) return undefined;
+
+  const decoded = tryDecodePaymentHeaderToJson(headerValue);
+  if (!decoded) return undefined;
+
+  const from = decoded?.payload?.authorization?.from;
+  return typeof from === 'string' ? from : undefined;
+}
 
 async function main() {
   const agentId = getAgentId('agent1');
@@ -46,14 +79,22 @@ async function main() {
     },
     async ({ tokens }) => {
       const data = await getCryptoPrice(tokens); // call actual tool
+      console.log('----------  ERC-8004 feedbackAuth signed  ----------');
+      const payerAddress = mcpRequestContext.getStore()?.payerAddress;
+      const feedbackAuth = await new FeedbackManager(process.env.A1_PRIVATE_KEY!).signFeedbackAuth(agentId, payerAddress!);
+      console.log(`Address: ${payerAddress}`);
+      console.log(`feedbackAuth: ${feedbackAuth}`);
+      console.log('----------  ERC-8004 feedbackAuth signed  ----------\n');
+
+      const payload = { feedbackAuth, ...data };
       return {
         content: [
           {
             type: 'text',
-            text: JSON.stringify(data),
+            text: JSON.stringify(payload),
           },
         ],
-        structuredContent: data,
+        structuredContent: payload,
       };
     },
   );
@@ -67,14 +108,22 @@ async function main() {
     },
     async () => {
       const data = await getBlockNumber(); // call actual tool
+      console.log('----------  ERC-8004 feedbackAuth signed  ----------');
+      const payerAddress = mcpRequestContext.getStore()?.payerAddress;
+      const feedbackAuth = await new FeedbackManager(process.env.A1_PRIVATE_KEY!).signFeedbackAuth(agentId, payerAddress!);
+      console.log(`Address: ${payerAddress}`);
+      console.log(`feedbackAuth: ${feedbackAuth}`);
+      console.log('----------  ERC-8004 feedbackAuth signed  ----------\n');
+
+      const payload = { feedbackAuth, ...data };
       return {
         content: [
           {
             type: 'text',
-            text: JSON.stringify(data),
+            text: JSON.stringify(payload),
           },
         ],
-        structuredContent: data,
+        structuredContent: payload,
       };
     },
   );
@@ -93,7 +142,7 @@ async function main() {
 
   // -----  add a2a agent executor to reply the request  -----
   class CryptoPriceExecutor implements AgentExecutor {
-    async execute(requestContext: RequestContext, eventBus: ExecutionEventBus): Promise<void> {
+    async execute(requestContext: A2ARequestContext, eventBus: ExecutionEventBus): Promise<void> {
       const parts = requestContext.userMessage?.parts ?? [];
 
       let userText = '';
@@ -191,7 +240,19 @@ async function main() {
     return next();
   }, async (req: Request, res: Response) => {
     try {
-      await transport.handleRequest(req, res, req.body); // use transport to convert mcp <-> http
+      const isToolCall = req.body?.method === 'tools/call';
+      const payerAddress = isToolCall ? getPayerAddressFromX402Header(req) : undefined;
+
+      if (isToolCall) {
+        console.log('----------  x402 payerAddress in header  ----------');
+        console.log(payerAddress);
+        console.log('----------  x402 payerAddress in header  ----------\n');
+      }
+
+      const store: McpRequestContext = payerAddress ? { payerAddress } : {};
+      await mcpRequestContext.run(store, async () => {
+        await transport.handleRequest(req, res, req.body); // use transport to convert mcp <-> http
+      });
     } catch (error) {
       console.error('Error handling MCP request:', error);
       if (!res.headersSent) {
