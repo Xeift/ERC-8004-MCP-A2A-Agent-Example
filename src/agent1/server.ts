@@ -1,7 +1,7 @@
 import 'dotenv/config';
 
 import { AGENT_CARD_PATH, type AgentCard, type Message, type TextPart } from '@a2a-js/sdk';
-import { DefaultRequestHandler, InMemoryTaskStore, type AgentExecutor, type ExecutionEventBus, type RequestContext as A2ARequestContext } from '@a2a-js/sdk/server';
+import { DefaultRequestHandler, InMemoryTaskStore, type RequestContext as A2ARequestContext, type AgentExecutor, type ExecutionEventBus } from '@a2a-js/sdk/server';
 import { agentCardHandler, jsonRpcHandler, UserBuilder } from '@a2a-js/sdk/server/express';
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { StreamableHTTPServerTransport } from '@modelcontextprotocol/sdk/server/streamableHttp.js';
@@ -12,7 +12,7 @@ import { paymentMiddleware, type Resource } from 'x402-express';
 import { NetworkSchema } from 'x402/types';
 import { z } from 'zod';
 import { getAgentId } from '../erc-8004/agent-id-manager.js';
-import { FeedbackManager } from '../erc-8004/feedbackManager.js';
+import { FeedbackManager } from '../erc-8004/feedback-manager.js';
 import { askAgent1 } from './ask-agent1.js';
 import { getBlockNumber } from './get-block-number.js';
 import { getCryptoPrice } from './get-crypto-price.js';

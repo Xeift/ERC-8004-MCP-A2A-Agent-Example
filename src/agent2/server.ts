@@ -8,7 +8,7 @@ import { paymentMiddleware, type Resource } from 'x402-express';
 import { NetworkSchema } from 'x402/types';
 import { z } from 'zod';
 import { getAgentId } from '../erc-8004/agent-id-manager.js';
-import { FeedbackManager } from '../erc-8004/feedbackManager.js';
+import { FeedbackManager } from '../erc-8004/feedback-manager.js';
 import { generateImage } from './generate-image.js';
 import { uploadImgbb } from './upload-imgbb.js';
 
