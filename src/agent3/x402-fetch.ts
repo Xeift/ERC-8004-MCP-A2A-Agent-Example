@@ -1,8 +1,22 @@
 import 'dotenv/config';
-import { createSigner, wrapFetchWithPayment } from 'x402-fetch';
+import { createSigner, decodeXPaymentResponse, wrapFetchWithPayment } from 'x402-fetch';
+import { decodePayment } from 'x402/schemes';
+import { FeedbackManager } from '../erc-8004/feedback-manager.js';
 
 type FetchLike = typeof fetch;
 let fetchWithPayment: FetchLike | null = null;
+
+export type X402PaymentInfo = {
+    payer?: string;
+    txHash?: string;
+    amount?: string;
+};
+
+let lastPaymentInfo: X402PaymentInfo | null = null;
+
+export function getLastX402PaymentInfo(): X402PaymentInfo | null {
+    return lastPaymentInfo;
+}
 
 // prevent 406 error: Not Acceptable: Client must accept both application/json and text/event-stream
 // 
@@ -43,10 +57,146 @@ function normalizeHeaders(headers: RequestInit['headers']): HeadersInit | undefi
     return { ...headers };
 }
 
+function getHeaderValue(headers: RequestInit['headers'], name: string): string | undefined {
+    if (!headers) return undefined;
+    const lowerName = name.toLowerCase();
+    if (headers instanceof Headers) {
+        return headers.get(name) ?? headers.get(lowerName) ?? undefined;
+    }
+    if (Array.isArray(headers)) {
+        const match = headers.find(([key]) => key.toLowerCase() === lowerName);
+        return match?.[1];
+    }
+    const record = headers as Record<string, string | string[] | undefined>;
+    const value = record[name] ?? record[lowerName];
+    if (Array.isArray(value)) return value.join(', ');
+    return typeof value === 'string' ? value : undefined;
+}
+
+function extractAmountFromPaymentHeader(paymentHeader: string | undefined): string | undefined {
+    if (!paymentHeader) return undefined;
+    try {
+        const decoded = decodePayment(paymentHeader);
+        const payload = decoded.payload as { authorization?: { value?: string } };
+        const value = payload.authorization?.value;
+        return typeof value === 'string' ? value : undefined;
+    } catch {
+        return undefined;
+    }
+}
+
+type JsonObject = Record<string, unknown>;
+
+type ParsedRequestInfo = {
+    prompt: string | undefined;
+};
+
+function asObject(value: unknown): JsonObject | undefined {
+    if (!value || typeof value !== 'object' || Array.isArray(value)) return undefined;
+    return value as JsonObject;
+}
+
+function tryParseJson(body: string): JsonObject | undefined {
+    try {
+        return asObject(JSON.parse(body));
+    } catch {
+        return undefined;
+    }
+}
+
+function extractPrompt(payload: JsonObject | undefined): string | undefined {
+    if (!payload) return undefined;
+
+    const params = asObject(payload.params);
+    const args = asObject(params?.arguments);
+    const prompt = args?.prompt;
+    if (typeof prompt === 'string') return prompt;
+
+    const message = asObject(params?.message ?? payload.message);
+    const parts = message?.parts;
+    if (Array.isArray(parts)) {
+        for (const part of parts) {
+            const partObject = asObject(part);
+            if (partObject?.kind === 'text' && typeof partObject.text === 'string') {
+                return partObject.text;
+            }
+        }
+    }
+
+    return undefined;
+}
+
+function parseRequestBody(body: string): ParsedRequestInfo {
+    const parsed = tryParseJson(body);
+    if (!parsed) {
+        return { prompt: undefined };
+    }
+    return {
+        prompt: extractPrompt(parsed),
+    };
+}
+
 export async function x402Fetch(privateKey: string) {
     if (!fetchWithPayment) {
         const signer = await createSigner(process.env.CHAIN_NAME!, privateKey);
-        const paidFetch = wrapFetchWithPayment(fetch, signer);
+        const feedbackManager = new FeedbackManager(privateKey);
+        const instrumentedFetch: FetchLike = async (input, init) => {
+            const requestInfo = typeof init?.body === 'string'
+                ? parseRequestBody(init.body)
+                : undefined;
+
+            const response = await fetch(input, init);
+            const paymentHeader = getHeaderValue(init?.headers, 'X-PAYMENT');
+            const paymentResponseHeader = response.headers.get('X-PAYMENT-RESPONSE');
+            let amount: string | undefined;
+            let txHash: string | undefined;
+            let payer: string | undefined;
+
+            if (paymentHeader || paymentResponseHeader) {
+                amount = extractAmountFromPaymentHeader(paymentHeader);
+
+                if (paymentResponseHeader) {
+                    try {
+                        const decoded = decodeXPaymentResponse(paymentResponseHeader);
+                        txHash = decoded.transaction;
+                        payer = decoded.payer;
+                    }
+                    catch {
+                    }
+                }
+
+                const nextPaymentInfo: X402PaymentInfo = {};
+                if (amount) nextPaymentInfo.amount = amount;
+                if (txHash) nextPaymentInfo.txHash = txHash;
+                if (payer) nextPaymentInfo.payer = payer;
+
+                if (Object.keys(nextPaymentInfo).length > 0) {
+                    lastPaymentInfo = nextPaymentInfo;
+                }
+            }
+
+            if (requestInfo) {
+                let amountNumber: number | undefined;
+                if (amount !== undefined) {
+                    const parsedAmount = Number.parseFloat(amount);
+                    if (Number.isFinite(parsedAmount)) {
+                        amountNumber = parsedAmount;
+                    }
+                }
+                if (requestInfo.prompt !== undefined || amountNumber !== undefined || txHash || payer) {
+                    FeedbackManager.saveFeedbackMaterial(
+                        undefined,
+                        requestInfo.prompt,
+                        amountNumber,
+                        txHash,
+                        payer,
+                    );
+                }
+            }
+
+            return response;
+        };
+        const paidFetch = wrapFetchWithPayment(instrumentedFetch, signer);
         fetchWithPayment = (input, init) => {
             if (!init) {
                 return paidFetch(input as RequestInfo, init);
