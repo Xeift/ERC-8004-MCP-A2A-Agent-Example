@@ -124,6 +124,6 @@ export class FeedbackManager {
             ...(score !== undefined && { score }),
         };
 
-        writeFileSync(fileName, JSON.stringify(data), 'utf-8');
+        writeFileSync(fileName, JSON.stringify(data, null, 2), 'utf-8');
     }
 }
