@@ -58,7 +58,18 @@ export class FeedbackManager {
         return feedbackAuth;
     }
 
-    async giveFeedback(agentId: string, score: number, feedbackAuth: string, txHash: string, amount: string) {
+    async giveFeedback(score: number) {
+        const material = FeedbackManager.getFeedbackFeedbackMaterial();
+        if (!material || Object.keys(material).length === 0) {
+            return 'no feedback need to submit!';
+        }
+        const { agentId, feedbackAuth, txHash, amount } = material;
+        if (!agentId) throw new Error('Missing agentId.');
+        if (!feedbackAuth) throw new Error('Missing feedbackAuth.');
+        if (!txHash) throw new Error('Missing txHash.');
+        if (amount === undefined) throw new Error('Missing amount.');
+        const amountValue = String(amount);
+
         const feedbackFile = this.sdk.prepareFeedback(
             agentId,
             score,
@@ -69,7 +80,7 @@ export class FeedbackManager {
             undefined, // skill
             undefined, // task
             undefined, // context
-            { txHash, amount } // x402 proofOfPayment
+            { txHash, amount: amountValue } // x402 proofOfPayment
         );
 
         console.log('----------  ERC-8004 Feedback  ----------');
@@ -78,11 +89,12 @@ export class FeedbackManager {
         console.log(`score: ${score}`);
         console.log(`feedbackAuth: ${feedbackAuth}`);
         console.log(`txHash: ${txHash}`);
-        console.log(`amount: ${amount}`);
+        console.log(`amount: ${amountValue}`);
         const feedback = await this.sdk.giveFeedback(agentId, feedbackFile, feedbackAuth);
         const result = `Feedback submitted with ID: ${feedback.id.join(':')}`;
         console.log(result);
         console.log('----------  ERC-8004 Feedback  ----------');
+        FeedbackManager.clearFeedbackMaterial(); // prevent agent submit feedback again and again
 
         return result;
     }
@@ -97,8 +109,6 @@ export class FeedbackManager {
 
         feedbackAuth?: string,
         result?: string,
-
-        score?: number,
     ) {
         const fileName = join(import.meta.dirname, 'feedback-queue.json');
         let data: Feedback = {};
@@ -121,9 +131,26 @@ export class FeedbackManager {
 
             ...(result !== undefined && { result }),
             ...(feedbackAuth !== undefined && { feedbackAuth }),
-            ...(score !== undefined && { score }),
         };
 
         writeFileSync(fileName, JSON.stringify(data, null, 2), 'utf-8');
+    }
+
+    static getFeedbackFeedbackMaterial(): Feedback | undefined {
+        const fileName = join(import.meta.dirname, 'feedback-queue.json');
+        if (!existsSync(fileName)) return undefined;
+        try {
+            const raw = readFileSync(fileName, 'utf-8');
+            const parsed = JSON.parse(raw);
+            if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) return undefined;
+            return getLatestFeedbackFromRecord(parsed as Record<string, unknown>);
+        } catch {
+            return undefined;
+        }
+    }
+
+    static clearFeedbackMaterial() {
+        const fileName = join(import.meta.dirname, 'feedback-queue.json');
+        writeFileSync(fileName, '{}', 'utf-8');
     }
 }

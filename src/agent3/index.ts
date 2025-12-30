@@ -7,7 +7,7 @@ import { Agent, MCPServerStreamableHttp, run, setDefaultOpenAIClient, setOpenAIA
 import { OpenAI } from 'openai/client.js';
 import { getAgentId } from '../erc-8004/agent-id-manager.js';
 import { FeedbackManager } from '../erc-8004/feedback-manager.js';
-import { getLastX402PaymentInfo, x402Fetch } from './x402-fetch.js';
+import { x402Fetch } from './x402-fetch.js';
 
 
 const agentId = getAgentId('agent3');
@@ -76,56 +76,31 @@ const giveFeedbackTool = tool({
   name: 'give_feedback',
   description: `
   Write feedback for the ERC-8004 AI Agent you used.
-  agentId is the agent you interacted with,
   score should be 0 ~ 100, or -1 if you want to auto-score an image.
-  feedbackAuth will be returned along with the response from other agent.
-  When score is -1, prompt and imageUrl are required to compute the score.
+  This tool will read feedback material saved from MCP tool calls and payments.
   `,
   parameters: z.object({
-    agentId: z.string(),
     score: z.number(),
-    feedbackAuth: z.string(),
-    prompt: z.string().optional(),
-    imageUrl: z.string().url().optional(),
   }),
-  execute: async ({ agentId, score, feedbackAuth, prompt, imageUrl }) => {
+  execute: async ({ score }) => {
     let resolvedScore = score;
     if (score === -1) {
-      if (!prompt || !imageUrl) {
-        throw new Error('Missing prompt/imageUrl.');
+      const material = FeedbackManager.getFeedbackFeedbackMaterial();
+      if (!material) {
+        throw new Error('Missing feedback material.');
       }
-      const imageScore = await getImageScore(prompt, imageUrl);
+      const { prompt, result } = material;
+      if (!prompt || !result) {
+        throw new Error('Missing prompt/result for image scoring.');
+      }
+      const imageScore = await getImageScore(prompt, result);
       if (!imageScore) {
         throw new Error('Missing imageScore.');
       }
       resolvedScore = imageScore.score;
     }
-    const paymentInfo = getLastX402PaymentInfo();
-    const resolvedTxHash = paymentInfo?.txHash;
-    const resolvedAmount = paymentInfo?.amount;
-    if (!resolvedTxHash || !resolvedAmount) {
-      throw new Error('Missing x402 payment info.');
-    }
-    return await new FeedbackManager(privateKey).giveFeedback(agentId, resolvedScore, feedbackAuth, resolvedTxHash, resolvedAmount);
-  }
-});
 
-const saveFeedbackAuthTool = tool({
-  name: 'save_feedback_auth',
-  description: 'Only use this tool when received feedbackAuth. Save feedbackAuth and result for further use.',
-  parameters: z.object({ feedbackAuth: z.string(), result: z.string() }),
-  execute: async ({ feedbackAuth, result }) => {
-    FeedbackManager.saveFeedbackMaterial(
-      undefined,
-      undefined,
-      undefined,
-      undefined,
-      undefined,
-      feedbackAuth,
-      result
-    );
-
-    return 'Success!';
+    return await new FeedbackManager(privateKey).giveFeedback(resolvedScore);
   }
 });
 
@@ -160,14 +135,12 @@ const agent = new Agent({
   2. 你是一位專業的 Web3 研究員，使用者給定一個主題，你負責產生 Web3 日報給使用者。
   3. 使用 A2A 的流程是先用 fetch_agent_card 取得 Agent Card，再根據 Agent Card 中的 endpoint 用 call_a2a_server。
   4. 你必須使用 A2A 委託 http://localhost:3000 的 agent（agentId 為 84532:1995）幫你查詢各種你需要的資料（不可委託其產日報）。
-  5. 也必須使用 Agent2 MCP Server（agentId 為 84532:1996）的工具幫你畫日報**內容**相關的圖，儘量避免生成的圖中出現文字。
-  6. 特別注意：如果該 MCP 工具有回傳 feedbackAuth，表示其支援 ERC-8004，則你必須使用 save_feedback_auth 工具儲存 feedbackAuth 和其他結果。
+  5. 也必須使用 Agent2 MCP Server（agentId 為 84532:1996）的工具幫你畫日報**內容**相關的圖，儘量避免生成的圖中出現文字（Agent 2 不支援 A2A）。
+  6. 特別注意：如果該 MCP 工具有回傳 feedbackAuth，系統會在工具回應時自動儲存，你仍要使用 give_feedback 完成評分。
   7. 你非常喜歡臺灣小吃，所以可以適時用臺灣小吃和譬喻的方式解釋複雜的概念。
   `,
-  // 如果 MCP 工具的回覆是文字，score 你可以自行判斷，然後使用 give_feedback 工具。
-  // 如果 MCP 工具的回覆是圖片，請將 score 設為 -1，並提供 prompt 與 imageUrl，讓 give_feedback 自動計算 score。
   model: 'nvidia/nemotron-3-nano-30b-a3b:free',
-  tools: [fetchAgentCardTool, callA2AServerTool, giveFeedbackTool, saveFeedbackAuthTool],
+  tools: [fetchAgentCardTool, callA2AServerTool, giveFeedbackTool],
   mcpServers: [agent2McpServer]
 });
 
@@ -199,6 +172,40 @@ function formatStreamedItem(item: any): string {
     const name = item.rawItem?.name ?? 'unknown';
     const agentId = mcpToolAgentIdByName.get(name);
     const agentLabel = agentId ? ` (agentId: ${agentId})` : '';
+
+    let payload: any;
+    const output = item.output;
+    if (output && typeof output === 'object') {
+      payload = (output as any).structuredContent ?? output;
+      if (payload && typeof payload.text === 'string') {
+        try {
+          payload = JSON.parse(payload.text);
+        } catch {
+        }
+      }
+    } else if (typeof output === 'string') {
+      try {
+        payload = JSON.parse(output);
+      } catch {
+      }
+    }
+
+    const feedbackAuth = typeof payload?.feedbackAuth === 'string' ? payload.feedbackAuth : undefined;
+    const result = typeof payload?.result === 'string'
+      ? payload.result
+      : (typeof payload?.imgURL === 'string' ? payload.imgURL : undefined);
+
+    if (feedbackAuth || result) {
+      FeedbackManager.saveFeedbackMaterial(
+        undefined,
+        undefined,
+        undefined,
+        undefined,
+        undefined,
+        feedbackAuth,
+        result
+      );
+    }
 
     return `📩［工具回應：${name}${agentLabel}］\n${printJson(item.output)}`;
   }
