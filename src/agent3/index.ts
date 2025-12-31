@@ -76,7 +76,8 @@ const giveFeedbackTool = tool({
   name: 'give_feedback',
   description: `
   Write feedback for the ERC-8004 AI Agent you used.
-  score should be 0 ~ 100, or -1 if you want to auto-score an image.
+  If you want to score an image, score must be -1, the tool will calculate the score for you automatically.
+  Otherwise, the score should be 0 ~ 100.
   This tool will read feedback material saved from MCP tool calls and payments.
   `,
   parameters: z.object({
