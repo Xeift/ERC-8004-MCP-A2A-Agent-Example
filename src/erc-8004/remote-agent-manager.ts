@@ -22,4 +22,11 @@ export class RemoteAgentManager {
 
         return nameResults.items;
     }
+
+    async getAgentDetail(agentId: string) {
+        const remoteAgent = await this.sdk.loadAgent(agentId);
+        const registrationFile = remoteAgent.getRegistrationFile();
+
+        return registrationFile;
+    }
 }

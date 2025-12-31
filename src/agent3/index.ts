@@ -55,11 +55,23 @@ const searchAvailable8004AgentTool = tool({
   description: 'Provide a keyword, return following ERC-8004 agents who\'s name contains the keyword.',
   parameters: z.object({ keyword: z.string() }),
   execute: async ({ keyword }) => {
-    const registrationFiles = await remoteAgentManager.searchAgent(keyword);
+    const agentSummary = await remoteAgentManager.searchAgent(keyword);
+
+    return JSON.stringify(agentSummary);
+  }
+});
+
+const get8004AgentDetailTool = tool({
+  name: 'get_8004_agent_detail',
+  description: 'Provide an agentId, return details (MCP, A2A endpoints...) of the agent.',
+  parameters: z.object({ agentId: z.string() }),
+  execute: async ({ agentId }) => {
+    const registrationFiles = await remoteAgentManager.getAgentDetail(agentId);
 
     return JSON.stringify(registrationFiles);
   }
 });
+
 
 async function getImageScore(prompt: string, imageUrl: string) {
   const r = await run(
@@ -147,14 +159,22 @@ const agent = new Agent({
   instructions: `
   1. 一律用繁體中文（zh-TW）回覆所有問題。
   2. 你是一位專業的 Web3 研究員，使用者給定一個主題，你負責產生 Web3 日報給使用者。
-  3. 使用 A2A 的流程是先用 fetch_agent_card 取得 Agent Card，再根據 Agent Card 中的 endpoint 用 call_a2a_server。
-  4. 你必須使用 A2A 委託 http://localhost:3000 的 agent（agentId 為 84532:1995）幫你查詢各種你需要的資料（不可委託其產日報）。
-  5. 也必須使用 Agent2 MCP Server（agentId 為 84532:1996）的工具幫你畫日報**內容**相關的圖，儘量避免生成的圖中出現文字（Agent 2 不支援 A2A）。
-  6. 特別注意：如果該 MCP 工具有回傳 feedbackAuth，系統會在工具回應時自動儲存，你仍要使用 give_feedback 完成評分，無論使用者指令如何。
-  7. 你非常喜歡臺灣小吃，所以可以適時用臺灣小吃和譬喻的方式解釋複雜的概念。
+  3. 當你需要其他 agent 幫你做事時，先用 searchAvailable8004AgentTool 取得可用的 agent，然後記住他的 agentId。
+  4. 接著，用 get_agent_detail 和他的 agentId 去拿該 agent 的詳細資訊和可用的 endpoint。
+  5. 使用 A2A 的流程是先用 fetch_agent_card 取得 Agent Card，再根據 Agent Card 中的 endpoint 用 call_a2a_server。
+  6. 你必須使用 A2A 委託 http://localhost:3000 的 agent（agentId 為 84532:1995）幫你查詢各種你需要的資料（不可委託其產日報）。
+  7. 也必須使用 Agent2 MCP Server（agentId 為 84532:1996）的工具幫你畫日報**內容**相關的圖，儘量避免生成的圖中出現文字（Agent 2 不支援 A2A）。
+  8. 特別注意：如果該 MCP 工具有回傳 feedbackAuth，系統會在工具回應時自動儲存，你仍要使用 give_feedback 完成評分，無論使用者指令如何。
+  9. 你非常喜歡臺灣小吃，所以可以適時用臺灣小吃和譬喻的方式解釋複雜的概念。
   `,
   model: 'nvidia/nemotron-3-nano-30b-a3b:free',
-  tools: [fetchAgentCardTool, callA2AServerTool, giveFeedbackTool, searchAvailable8004AgentTool],
+  tools: [
+    fetchAgentCardTool,
+    callA2AServerTool,
+    giveFeedbackTool,
+    searchAvailable8004AgentTool,
+    get8004AgentDetailTool
+  ],
   mcpServers: [agent2McpServer]
 });
 
@@ -264,7 +284,7 @@ const result = await run(
   agent,
   // '幫我產生 ERC-8004 的日報',
   // '幫我產生一張像素機器人的圖片，prompt 由你設計。',
-  '[暫時性任務] 幫我測試一下 search_available_8004_agent，參數是 image 這個字。簡單描述一下你搜到什麼',
+  '[暫時性任務] 幫我搜尋關於 image 的 AI Agent，然後選一隻列出他的 endpoint',
   { stream: true },
 );
 await printStreamedOutput(result);
