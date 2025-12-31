@@ -127,7 +127,6 @@ function parseRequestBody(body: string): ParsedRequestInfo {
 export async function x402Fetch(privateKey: string) {
     if (!fetchWithPayment) {
         const signer = await createSigner(process.env.CHAIN_NAME!, privateKey);
-        const feedbackManager = new FeedbackManager(privateKey);
         const instrumentedFetch: FetchLike = async (input, init) => {
             const requestInfo = typeof init?.body === 'string'
                 ? parseRequestBody(init.body)
@@ -152,7 +151,6 @@ export async function x402Fetch(privateKey: string) {
                     catch {
                     }
                 }
-
             }
 
             if (requestInfo) {
