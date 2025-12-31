@@ -70,6 +70,10 @@ export class FeedbackManager {
         if (amount === undefined) throw new Error('Missing amount.');
         const amountValue = String(amount);
 
+        // important: prevent "agentRegistry": "eip155:0:0x0",
+        const chainId = await this.sdk.chainId();
+        const identityRegistry = this.sdk.registries().IDENTITY;
+
         const feedbackFile = this.sdk.prepareFeedback(
             agentId,
             score,
@@ -80,18 +84,19 @@ export class FeedbackManager {
             undefined, // skill
             undefined, // task
             undefined, // context
-            { txHash, amount: amountValue } // x402 proofOfPayment
+            { txHash, amount: amountValue }, // x402 proofOfPayment
+            identityRegistry ? { agentRegistry: `eip155:${chainId}:${identityRegistry}` } : undefined // need to pass identityRegistry
         );
 
         console.log('----------  ERC-8004 Feedback  ----------');
         console.log('Submitting feedback');
-        console.log(`agentId: ${agentId}`);
-        console.log(`score: ${score}`);
-        console.log(`feedbackAuth: ${feedbackAuth}`);
-        console.log(`txHash: ${txHash}`);
-        console.log(`amount: ${amountValue}`);
+        console.log(`agentId: ${agentId} `);
+        console.log(`score: ${score} `);
+        console.log(`feedbackAuth: ${feedbackAuth} `);
+        console.log(`txHash: ${txHash} `);
+        console.log(`amount: ${amountValue} `);
         const feedback = await this.sdk.giveFeedback(agentId, feedbackFile, feedbackAuth);
-        const result = `Feedback submitted with ID: ${feedback.id.join(':')}`;
+        const result = `Feedback submitted with ID: ${feedback.id.join(':')} `;
         console.log(result);
         console.log('----------  ERC-8004 Feedback  ----------\n');
         FeedbackManager.clearFeedbackMaterial(); // prevent agent submit feedback again and again
