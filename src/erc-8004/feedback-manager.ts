@@ -93,7 +93,7 @@ export class FeedbackManager {
         const feedback = await this.sdk.giveFeedback(agentId, feedbackFile, feedbackAuth);
         const result = `Feedback submitted with ID: ${feedback.id.join(':')}`;
         console.log(result);
-        console.log('----------  ERC-8004 Feedback  ----------');
+        console.log('----------  ERC-8004 Feedback  ----------\n');
         FeedbackManager.clearFeedbackMaterial(); // prevent agent submit feedback again and again
 
         return result;
