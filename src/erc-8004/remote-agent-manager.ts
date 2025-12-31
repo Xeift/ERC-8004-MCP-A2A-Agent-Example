@@ -1,6 +1,8 @@
 import 'dotenv/config';
 
 import { SDK } from 'agent0-sdk';
+import { mkdirSync, writeFileSync } from 'fs';
+import { join } from 'path';
 
 export class RemoteAgentManager {
     sdk: SDK;
@@ -26,6 +28,18 @@ export class RemoteAgentManager {
     async getAgentDetail(agentId: string) {
         const remoteAgent = await this.sdk.loadAgent(agentId);
         const registrationFile = remoteAgent.getRegistrationFile();
+
+        const safeAgentId = agentId.replace(':', '-'); // prevent `:` naming problem on Windows
+        const registrationDir = join(import.meta.dirname, 'registration-files');
+        mkdirSync(registrationDir, { recursive: true });
+
+        const registrationFilePath = join(registrationDir, `${safeAgentId}.json`);
+        const registrationContent =
+            typeof registrationFile === 'string'
+                ? registrationFile
+                : JSON.stringify(registrationFile, null, 2);
+
+        writeFileSync(registrationFilePath, registrationContent, 'utf-8');
 
         return registrationFile;
     }
