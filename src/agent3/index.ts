@@ -7,6 +7,7 @@ import { Agent, MCPServerStreamableHttp, run, setDefaultOpenAIClient, setOpenAIA
 import { OpenAI } from 'openai/client.js';
 import { getAgentId } from '../erc-8004/agent-id-manager.js';
 import { FeedbackManager } from '../erc-8004/feedback-manager.js';
+import { RemoteAgentManager } from '../erc-8004/remote-agent-manager.js';
 import { x402Fetch } from './x402-fetch.js';
 
 
@@ -15,6 +16,7 @@ if (!agentId) throw new Error('Though it\'s not required to register as an ERC-8
 
 const privateKey = process.env.A3_PRIVATE_KEY;
 if (!privateKey) throw new Error('Missing A3_PRIVATE_KEY in .env');
+const remoteAgentManager = new RemoteAgentManager('agent3', privateKey);
 
 console.log('----------  Logged in as Agent3  ----------');
 console.log(`ERC-8004 Identity Registry agentId: ${agentId}`);
@@ -45,6 +47,17 @@ const callA2AServerTool = tool({
   parameters: z.object({ baseURL: z.string(), message: z.string() }),
   execute: async ({ baseURL, message }) => {
     return await callA2AServer(baseURL, message);
+  }
+});
+
+const searchAvailable8004AgentTool = tool({
+  name: 'search_available_8004_agent',
+  description: 'Provide a keyword, return following ERC-8004 agents who\'s name contains the keyword.',
+  parameters: z.object({ keyword: z.string() }),
+  execute: async ({ keyword }) => {
+    const registrationFiles = await remoteAgentManager.searchAgent(keyword);
+
+    return JSON.stringify(registrationFiles);
   }
 });
 
@@ -141,7 +154,7 @@ const agent = new Agent({
   7. 你非常喜歡臺灣小吃，所以可以適時用臺灣小吃和譬喻的方式解釋複雜的概念。
   `,
   model: 'nvidia/nemotron-3-nano-30b-a3b:free',
-  tools: [fetchAgentCardTool, callA2AServerTool, giveFeedbackTool],
+  tools: [fetchAgentCardTool, callA2AServerTool, giveFeedbackTool, searchAvailable8004AgentTool],
   mcpServers: [agent2McpServer]
 });
 
@@ -250,8 +263,8 @@ async function printStreamedOutput(result: StreamedRunResult<any, Agent<any, any
 const result = await run(
   agent,
   // '幫我產生 ERC-8004 的日報',
-  '幫我產生一張像素機器人的圖片，prompt 由你設計。',
-  // '[暫時性任務] 幫我取得最新的以太坊區塊號碼。feedbackAuth 請你暫時印出來就好，不需要特別做處理。',
+  // '幫我產生一張像素機器人的圖片，prompt 由你設計。',
+  '[暫時性任務] 幫我測試一下 search_available_8004_agent，參數是 image 這個字。簡單描述一下你搜到什麼',
   { stream: true },
 );
 await printStreamedOutput(result);
