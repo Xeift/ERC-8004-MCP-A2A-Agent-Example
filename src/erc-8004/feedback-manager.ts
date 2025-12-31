@@ -96,7 +96,8 @@ export class FeedbackManager {
         console.log(`txHash: ${txHash} `);
         console.log(`amount: ${amountValue} `);
         const feedback = await this.sdk.giveFeedback(agentId, feedbackFile, feedbackAuth);
-        const result = `Feedback submitted with ID: ${feedback.id.join(':')} `;
+        const result = `Feedback submitted with ID: ${feedback.id.join(':')}\n` +
+            `IPFS URL: ${feedback.fileURI?.replace('ipfs://', 'https://ipfs.io/ipfs/')}`;
         console.log(result);
         console.log('----------  ERC-8004 Feedback  ----------\n');
         FeedbackManager.clearFeedbackMaterial(); // prevent agent submit feedback again and again
