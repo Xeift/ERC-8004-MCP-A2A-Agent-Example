@@ -73,65 +73,10 @@ function extractAmountFromPaymentHeader(paymentHeader: string | undefined): stri
     }
 }
 
-type JsonObject = Record<string, unknown>;
-
-type ParsedRequestInfo = {
-    prompt: string | undefined;
-};
-
-function asObject(value: unknown): JsonObject | undefined {
-    if (!value || typeof value !== 'object' || Array.isArray(value)) return undefined;
-    return value as JsonObject;
-}
-
-function tryParseJson(body: string): JsonObject | undefined {
-    try {
-        return asObject(JSON.parse(body));
-    } catch {
-        return undefined;
-    }
-}
-
-function extractPrompt(payload: JsonObject | undefined): string | undefined {
-    if (!payload) return undefined;
-
-    const params = asObject(payload.params);
-    const args = asObject(params?.arguments);
-    const prompt = args?.prompt;
-    if (typeof prompt === 'string') return prompt;
-
-    const message = asObject(params?.message ?? payload.message);
-    const parts = message?.parts;
-    if (Array.isArray(parts)) {
-        for (const part of parts) {
-            const partObject = asObject(part);
-            if (partObject?.kind === 'text' && typeof partObject.text === 'string') {
-                return partObject.text;
-            }
-        }
-    }
-
-    return undefined;
-}
-
-function parseRequestBody(body: string): ParsedRequestInfo {
-    const parsed = tryParseJson(body);
-    if (!parsed) {
-        return { prompt: undefined };
-    }
-    return {
-        prompt: extractPrompt(parsed),
-    };
-}
-
 export async function x402Fetch(privateKey: string) {
     if (!fetchWithPayment) {
         const signer = await createSigner(process.env.CHAIN_NAME!, privateKey);
         const instrumentedFetch: FetchLike = async (input, init) => {
-            const requestInfo = typeof init?.body === 'string'
-                ? parseRequestBody(init.body)
-                : undefined;
-
             const response = await fetch(input, init);
             const paymentHeader = getHeaderValue(init?.headers, 'X-PAYMENT');
             const paymentResponseHeader = response.headers.get('X-PAYMENT-RESPONSE');
@@ -153,23 +98,21 @@ export async function x402Fetch(privateKey: string) {
                 }
             }
 
-            if (requestInfo) {
-                let amountNumber: number | undefined;
-                if (amount !== undefined) {
-                    const parsedAmount = Number.parseFloat(amount);
-                    if (Number.isFinite(parsedAmount)) {
-                        amountNumber = parsedAmount;
-                    }
+            let amountNumber: number | undefined;
+            if (amount !== undefined) {
+                const parsedAmount = Number.parseFloat(amount);
+                if (Number.isFinite(parsedAmount)) {
+                    amountNumber = parsedAmount;
                 }
-                if (requestInfo.prompt !== undefined || amountNumber !== undefined || txHash || payer) {
-                    FeedbackManager.saveFeedbackMaterial(
-                        undefined,
-                        requestInfo.prompt,
-                        amountNumber,
-                        txHash,
-                        payer,
-                    );
-                }
+            }
+            if (amountNumber !== undefined || txHash || payer) {
+                FeedbackManager.saveFeedbackMaterial(
+                    undefined,
+                    undefined,
+                    amountNumber,
+                    txHash,
+                    payer,
+                );
             }
 
             return response;
