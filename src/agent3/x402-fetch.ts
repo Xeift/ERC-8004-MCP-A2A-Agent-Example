@@ -6,18 +6,6 @@ import { FeedbackManager } from '../erc-8004/feedback-manager.js';
 type FetchLike = typeof fetch;
 let fetchWithPayment: FetchLike | null = null;
 
-export type X402PaymentInfo = {
-    payer?: string;
-    txHash?: string;
-    amount?: string;
-};
-
-let lastPaymentInfo: X402PaymentInfo | null = null;
-
-export function getLastX402PaymentInfo(): X402PaymentInfo | null {
-    return lastPaymentInfo;
-}
-
 // prevent 406 error: Not Acceptable: Client must accept both application/json and text/event-stream
 // 
 // 1. a3 mcp client will send request with following header:
@@ -165,14 +153,6 @@ export async function x402Fetch(privateKey: string) {
                     }
                 }
 
-                const nextPaymentInfo: X402PaymentInfo = {};
-                if (amount) nextPaymentInfo.amount = amount;
-                if (txHash) nextPaymentInfo.txHash = txHash;
-                if (payer) nextPaymentInfo.payer = payer;
-
-                if (Object.keys(nextPaymentInfo).length > 0) {
-                    lastPaymentInfo = nextPaymentInfo;
-                }
             }
 
             if (requestInfo) {
