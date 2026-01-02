@@ -1,15 +1,15 @@
 export async function getBlockNumber() {
   const body = {
-    jsonrpc: "2.0",
-    method: "eth_blockNumber",
+    jsonrpc: '2.0',
+    method: 'eth_blockNumber',
     params: [],
     id: 1
   };
 
   const res = await fetch('https://eth.llamarpc.com', {
-    method: "POST",
+    method: 'POST',
     headers: {
-      "Content-Type": "application/json"
+      'Content-Type': 'application/json'
     },
     body: JSON.stringify(body)
   });

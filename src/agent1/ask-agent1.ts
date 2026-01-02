@@ -70,7 +70,7 @@ function printResult(result: RunResult<any, Agent<any, any>>) {
     if (item.type === 'message') {
       out = `✅［模型回覆］\n${printJson(item.content[0].text)}`;
     }
-    else if (item.type === `function_call`) {
+    else if (item.type === 'function_call') {
       out = `🛠️［呼叫工具：${item.name}］\n${printJson(item.arguments)}`;
     }
     else if (item.type === 'function_call_result') {
@@ -87,9 +87,9 @@ function printResult(result: RunResult<any, Agent<any, any>>) {
     console.log(`----------  第 ${index + 1} 輪輸出  ----------\n`);
   });
 
-  console.log(`----------  最終輸出  ----------`);
+  console.log('----------  最終輸出  ----------');
   console.log(result.finalOutput);
-  console.log(`----------  最終輸出  ----------\n`);
+  console.log('----------  最終輸出  ----------\n');
 }
 
 export async function askAgent1(message: string): Promise<string> {

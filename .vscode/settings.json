@@ -1,21 +1,40 @@
 {
-    "cSpell.words": [
-        "AIAPI",
-        "arcee",
-        "deepseek",
-        "Handlerndler",
-        "IMGBB",
-        "IPFS",
-        "modelcontextprotocol",
-        "nemotron",
-        "OASF",
-        "OPENROUTER",
-        "schnell",
-        "Streamable",
-        "TAVILY",
-        "TRAVILY",
-        "tvly",
-        "uuidv"
-    ],
-    "chatgpt.commentCodeLensEnabled": false
+  "cSpell.words": [
+    "AIAPI",
+    "arcee",
+    "deepseek",
+    "Handlerndler",
+    "IMGBB",
+    "IPFS",
+    "modelcontextprotocol",
+    "nemotron",
+    "OASF",
+    "OPENROUTER",
+    "schnell",
+    "Streamable",
+    "TAVILY",
+    "TRAVILY",
+    "tvly",
+    "uuidv"
+  ],
+  "chatgpt.commentCodeLensEnabled": false,
+  "eslint.useFlatConfig": true,
+  "eslint.validate": ["javascript", "javascriptreact", "typescript", "typescriptreact"],
+  "editor.codeActionsOnSave": {
+    "source.fixAll.eslint": "explicit"
+  },
+  "editor.formatOnSave": true,
+  "editor.defaultFormatter": "esbenp.prettier-vscode",
+  "[javascript]": {
+    "editor.defaultFormatter": "esbenp.prettier-vscode"
+  },
+  "[javascriptreact]": {
+    "editor.defaultFormatter": "esbenp.prettier-vscode"
+  },
+  "[typescript]": {
+    "editor.defaultFormatter": "esbenp.prettier-vscode"
+  },
+  "[typescriptreact]": {
+    "editor.defaultFormatter": "esbenp.prettier-vscode"
+  }
 }

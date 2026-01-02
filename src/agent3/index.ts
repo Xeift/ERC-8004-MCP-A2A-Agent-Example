@@ -1,22 +1,35 @@
 import 'dotenv/config';
 
-import { z } from 'zod';
-import { callA2AServer, fetchAgentCard } from './a2a-client.js';
-
-import { Agent, MCPServerStreamableHttp, run, setDefaultOpenAIClient, setOpenAIAPI, setTracingDisabled, StreamedRunResult, tool } from '@openai/agents';
+import type { RunItem, RunStreamEvent } from '@openai/agents';
+import {
+  Agent,
+  MCPServerStreamableHttp,
+  run,
+  setDefaultOpenAIClient,
+  setOpenAIAPI,
+  setTracingDisabled,
+} from '@openai/agents';
 import { OpenAI } from 'openai/client.js';
 import { getAgentId } from '../erc-8004/agent-id-manager.js';
 import { FeedbackManager } from '../erc-8004/feedback-manager.js';
 import { RemoteAgentManager } from '../erc-8004/remote-agent-manager.js';
+import { callA2AServerTool } from './tools/call-a2a-server-tool.js';
+import { fetchAgentCardTool } from './tools/fetch-agent-card-tool.js';
+import { get8004AgentDetailTool } from './tools/get-8004-agent-detail-tool.ts.js';
+import { giveFeedbackTool } from './tools/give-feedback-tool.js';
+import { searchAvailable8004AgentTool } from './tools/search-available-8004-agent-tool.js';
 import { x402Fetch } from './x402-fetch.js';
 
-
 const agentId = getAgentId('agent3');
-if (!agentId) throw new Error('Though it\'s not required to register as an ERC-8004 agent to give feedback, in this example we use `register:a3` first to register the agent on chain.')
+if (!agentId)
+  throw new Error(
+    "Though it's not required to register as an ERC-8004 agent to give feedback, in this example we use `register:a3` first to register the agent on chain.",
+  );
 
 const privateKey = process.env.A3_PRIVATE_KEY;
 if (!privateKey) throw new Error('Missing A3_PRIVATE_KEY in .env');
 const remoteAgentManager = new RemoteAgentManager('agent3', privateKey);
+const feedbackManager = new FeedbackManager(privateKey);
 
 console.log('----------  Logged in as Agent3  ----------');
 console.log(`ERC-8004 Identity Registry agentId: ${agentId}`);
@@ -29,106 +42,7 @@ const openrouterClient = new OpenAI({
   baseURL: 'https://openrouter.ai/api/v1',
   apiKey: process.env.OPENROUTER_API_KEY!,
 });
-setDefaultOpenAIClient(openrouterClient)
-
-// -----  add custom tool  -----
-const fetchAgentCardTool = tool({
-  name: 'fetch_agent_card',
-  description: 'Fetch A2A Agent Card by providing baseURL. baseURL only contains scheme, domain and port(if any).',
-  parameters: z.object({ baseURL: z.string() }),
-  execute: async ({ baseURL }) => {
-    return await fetchAgentCard(baseURL);
-  }
-});
-
-const callA2AServerTool = tool({
-  name: 'call_a2a_server',
-  description: 'Call any A2A server by providing baseURL and message. baseURL only contains scheme, domain and port(if any).',
-  parameters: z.object({ baseURL: z.string(), message: z.string() }),
-  execute: async ({ baseURL, message }) => {
-    return await callA2AServer(baseURL, message);
-  }
-});
-
-const searchAvailable8004AgentTool = tool({
-  name: 'search_available_8004_agent',
-  description: 'Provide a keyword, return following ERC-8004 agents who\'s name contains the keyword.',
-  parameters: z.object({ keyword: z.string() }),
-  execute: async ({ keyword }) => {
-    const agentSummary = await remoteAgentManager.searchAgent(keyword);
-
-    return JSON.stringify(agentSummary);
-  }
-});
-
-const get8004AgentDetailTool = tool({
-  name: 'get_8004_agent_detail',
-  description: 'Provide an agentId, return details (MCP, A2A endpoints...) of the agent.',
-  parameters: z.object({ agentId: z.string() }),
-  execute: async ({ agentId }) => {
-    const registrationFiles = await remoteAgentManager.getAgentDetail(agentId);
-
-    return JSON.stringify(registrationFiles);
-  }
-});
-
-
-async function getImageScore(prompt: string, imageUrl: string) {
-  const r = await run(
-    new Agent({
-      name: 'ImageScorer',
-      model: 'nvidia/nemotron-nano-12b-v2-vl:free',
-      modelSettings: { temperature: 0 },
-      instructions: `根據以下 prompt 評分圖片符合度（0~100），並給 1~3 個簡短原因。\n\nprompt:\n${prompt}`,
-      outputType: z.object({
-        score: z.number().min(0).max(100),
-        reasons: z.array(z.string()).min(1).max(3),
-      }),
-    }),
-    [
-      {
-        type: 'message',
-        role: 'user',
-        content: [{ type: 'input_image', image: imageUrl }],
-      },
-    ],
-  );
-
-  return r.finalOutput;
-}
-
-const giveFeedbackTool = tool({
-  name: 'give_feedback',
-  description: `
-  Write feedback for the ERC-8004 AI Agent you used.
-  If you want to score an image, score must be -1, the tool will calculate the score for you automatically.
-  Otherwise, the score should be 0 ~ 100.
-  This tool will read feedback material saved from MCP tool calls and payments.
-  `,
-  parameters: z.object({
-    score: z.number(),
-  }),
-  execute: async ({ score }) => {
-    let resolvedScore = score;
-    if (score === -1) {
-      const material = FeedbackManager.getFeedbackFeedbackMaterial();
-      if (!material) {
-        throw new Error('Missing feedback material.');
-      }
-      const { prompt, result } = material;
-      if (!prompt || !result) {
-        throw new Error('Missing prompt/result for image scoring.');
-      }
-      const imageScore = await getImageScore(prompt, result);
-      if (!imageScore) {
-        throw new Error('Missing imageScore.');
-      }
-      resolvedScore = imageScore.score;
-    }
-
-    return await new FeedbackManager(privateKey).giveFeedback(resolvedScore);
-  }
-});
+setDefaultOpenAIClient(openrouterClient);
 
 // -----  add agent2 mcp server  ----
 const url = `http://localhost:${process.env.A2_SERVER_PORT}/mcp`;
@@ -167,67 +81,75 @@ const agent = new Agent({
   8. 特別注意：如果該 MCP 工具有回傳 feedbackAuth，系統會在工具回應時自動儲存，你仍要使用 give_feedback 完成評分，無論使用者指令如何。
   9. 你非常喜歡臺灣小吃，所以可以適時用臺灣小吃和譬喻的方式解釋複雜的概念。
   `,
-  model: 'nvidia/nemotron-3-nano-30b-a3b:free',
+  model: process.env.A3_MODEL!,
   tools: [
     fetchAgentCardTool,
     callA2AServerTool,
-    giveFeedbackTool,
-    searchAvailable8004AgentTool,
-    get8004AgentDetailTool
+    giveFeedbackTool(feedbackManager),
+    searchAvailable8004AgentTool(remoteAgentManager),
+    get8004AgentDetailTool(remoteAgentManager),
   ],
-  mcpServers: [agent2McpServer]
+  mcpServers: [agent2McpServer],
 });
 
-function printJson(input: any): string {
-  if (input !== null && typeof input === 'object') {
-    return JSON.stringify(input)
-  }
-  return input;
+function printJson(input: unknown): string {
+  if (typeof input === 'string') return input;
+  return JSON.stringify(input) ?? String(input);
 }
 
-function formatStreamedItem(item: any): string {
+function formatStreamedItem(item: RunItem): string {
   if (item.type === 'message_output_item') {
     return `✅［模型回覆］\n${printJson(item.content)}`;
   }
   if (item.type === 'tool_call_item') {
-    const name = item.rawItem?.name ?? 'unknown';
+    const rawItem = item.rawItem;
+    const hasNamedArgs = rawItem?.type === 'function_call' || rawItem?.type === 'hosted_tool_call';
+    const name = hasNamedArgs ? rawItem.name : (rawItem?.type ?? 'unknown');
     const agentId = mcpToolAgentIdByName.get(name);
     const agentLabel = agentId ? ` (agentId: ${agentId})` : '';
 
-    if (agentId) {
-      const rawArgs = item.rawItem?.arguments;
+    const rawArgs = hasNamedArgs ? rawItem.arguments : undefined;
+    if (agentId && rawArgs !== undefined) {
       const prompt = typeof rawArgs === 'string' ? rawArgs : JSON.stringify(rawArgs);
       FeedbackManager.saveFeedbackMaterial(agentId, prompt);
     }
 
-    return `🛠️［呼叫工具：${name}${agentLabel}］\n${printJson(item.rawItem?.arguments)}`;
+    const argsForDisplay = rawArgs ?? rawItem;
+    return `🛠️［呼叫工具：${name}${agentLabel}］\n${printJson(argsForDisplay)}`;
   }
   if (item.type === 'tool_call_output_item') {
-    const name = item.rawItem?.name ?? 'unknown';
+    const rawItem = item.rawItem;
+    const name =
+      rawItem?.type === 'function_call_result' ? rawItem.name : (rawItem?.type ?? 'unknown');
     const agentId = mcpToolAgentIdByName.get(name);
     const agentLabel = agentId ? ` (agentId: ${agentId})` : '';
 
-    let payload: any;
+    let payload: unknown;
     const output = item.output;
     if (output && typeof output === 'object') {
-      payload = (output as any).structuredContent ?? output;
-      if (payload && typeof payload.text === 'string') {
+      payload = (output as { structuredContent?: unknown }).structuredContent ?? output;
+      const payloadText = (payload as { text?: unknown }).text;
+      if (typeof payloadText === 'string') {
         try {
-          payload = JSON.parse(payload.text);
-        } catch {
-        }
+          payload = JSON.parse(payloadText);
+        } catch {}
       }
     } else if (typeof output === 'string') {
       try {
         payload = JSON.parse(output);
-      } catch {
-      }
+      } catch {}
     }
 
-    const feedbackAuth = typeof payload?.feedbackAuth === 'string' ? payload.feedbackAuth : undefined;
-    const result = typeof payload?.result === 'string'
-      ? payload.result
-      : (typeof payload?.imgURL === 'string' ? payload.imgURL : undefined);
+    const payloadRecord =
+      payload && typeof payload === 'object' ? (payload as Record<string, unknown>) : undefined;
+    const feedbackAuth =
+      typeof payloadRecord?.feedbackAuth === 'string' ? payloadRecord.feedbackAuth : undefined;
+    const result =
+      typeof payloadRecord?.result === 'string'
+        ? payloadRecord.result
+        : typeof payloadRecord?.imgURL === 'string'
+          ? payloadRecord.imgURL
+          : undefined;
 
     if (feedbackAuth || result) {
       FeedbackManager.saveFeedbackMaterial(
@@ -237,7 +159,7 @@ function formatStreamedItem(item: any): string {
         undefined,
         undefined,
         feedbackAuth,
-        result
+        result,
       );
     }
 
@@ -259,7 +181,7 @@ function formatStreamedItem(item: any): string {
     return `🔁［handoff 回應：${name}］\n${printJson(item.rawItem?.output ?? item.rawItem)}`;
   }
   if (item.type === 'tool_approval_item') {
-    const name = item.name ?? item.rawItem?.name ?? 'tool';
+    const name = item.name ?? 'tool';
     return `🛂［工具審核：${name}］`;
   }
 
@@ -267,7 +189,7 @@ function formatStreamedItem(item: any): string {
 }
 
 // -----  print each round message (streaming only)  -----
-async function printStreamedOutput(result: StreamedRunResult<any, Agent<any, any>>) {
+async function printStreamedOutput(result: AsyncIterable<RunStreamEvent>) {
   let outputIndex = 0;
 
   for await (const event of result) {
@@ -285,6 +207,7 @@ const result = await run(
   // '幫我產生 ERC-8004 的日報',
   // '幫我產生一張像素機器人的圖片，prompt 由你設計。',
   '[暫時性任務] 幫我搜尋關於 image 的 AI Agent，然後選一隻列出他的 endpoint',
+  // '[暫時性任務] 幫我拿 http://localhost:3000 的 agent card 然後印出來',
   { stream: true },
 );
 await printStreamedOutput(result);
