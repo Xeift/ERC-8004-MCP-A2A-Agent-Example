@@ -3,10 +3,18 @@ import 'dotenv/config';
 import { z } from 'zod';
 import { getCryptoPrice } from './get-crypto-price.js';
 
-import { Agent, MCPServerStreamableHttp, run, RunResult, setDefaultOpenAIClient, setOpenAIAPI, setTracingDisabled, tool } from '@openai/agents';
+import {
+  Agent,
+  type AgentOutputItem,
+  MCPServerStreamableHttp,
+  run,
+  setDefaultOpenAIClient,
+  setOpenAIAPI,
+  setTracingDisabled,
+  tool,
+} from '@openai/agents';
 import { OpenAI } from 'openai/client.js';
 import { getBlockNumber } from './get-block-number.js';
-
 
 // -----  use custom client   -----
 setOpenAIAPI('chat_completions');
@@ -15,17 +23,18 @@ setDefaultOpenAIClient(
   new OpenAI({
     baseURL: 'https://openrouter.ai/api/v1',
     apiKey: process.env.OPENROUTER_API_KEY!,
-  })
-)
+  }),
+);
 
 // -----  add custom tool   -----
 const getCryptoPriceTool = tool({
   name: 'get_crypto_price',
-  description: 'Get the crypto price in USD for given token(s) using Coingecko API. Tokens are separated by commas. e.g. BTC,ETH',
+  description:
+    'Get the crypto price in USD for given token(s) using Coingecko API. Tokens are separated by commas. e.g. BTC,ETH',
   parameters: z.object({ tokens: z.string() }),
   execute: async ({ tokens }) => {
     return await getCryptoPrice(tokens);
-  }
+  },
 });
 
 const getBlockNumberTool = tool({
@@ -34,7 +43,7 @@ const getBlockNumberTool = tool({
   parameters: z.object({}),
   execute: async () => {
     return await getBlockNumber();
-  }
+  },
 });
 
 // -----  add mcp server  -----
@@ -48,39 +57,60 @@ await tavilyMcpServer.connect();
 // -----  create agent  -----
 const agent = new Agent({
   name: 'Assistant',
-  instructions: '一律用繁體中文（zh-TW）回覆所有問題。你是一位專業的 Web3 研究員。使用者發問時，必須先用 tavily_search 工具搜尋，再用 get_crypto_price 工具取得即時幣價資料。',
+  instructions:
+    '一律用繁體中文（zh-TW）回覆所有問題。你是一位專業的 Web3 研究員。使用者發問時，必須先用 tavily_search 工具搜尋，再用 get_crypto_price 工具取得即時幣價資料。',
   model: 'nvidia/nemotron-3-nano-30b-a3b:free',
   tools: [getCryptoPriceTool, getBlockNumberTool],
   mcpServers: [tavilyMcpServer],
 });
 
-// -----  print each round message  -----
-function printResult(result: RunResult<any, Agent<any, any>>) {
+type TextPart = { text: string };
 
-  function printJson(input: any): string {
+function isTextPart(value: unknown): value is TextPart {
+  if (typeof value !== 'object' || value === null) return false;
+  return typeof (value as { text?: unknown }).text === 'string';
+}
+
+function getTextFromContent(content: unknown): string | undefined {
+  if (typeof content === 'string') return content;
+  if (!Array.isArray(content)) return undefined;
+
+  for (const part of content) {
+    if (isTextPart(part)) return part.text;
+  }
+  return undefined;
+}
+
+type AgentRunResult = {
+  output: AgentOutputItem[];
+  finalOutput?: unknown;
+};
+
+// -----  print each round message  -----
+function printResult(result: AgentRunResult) {
+  function printJson(input: unknown): string {
+    if (input === undefined) return 'undefined';
     if (input !== null && typeof input === 'object') {
-      return JSON.stringify(input)
+      return JSON.stringify(input);
     }
-    return input;
+    return String(input);
   }
 
-  result.output.forEach((item: any, index: number) => {
+  result.output.forEach((item, index) => {
     console.log(`----------  第 ${index + 1} 輪輸出  ----------`);
     let out: string = '';
     if (item.type === 'message') {
-      out = `✅［模型回覆］\n${printJson(item.content[0].text)}`;
-    }
-    else if (item.type === 'function_call') {
+      const text = getTextFromContent(item.content);
+      out = `✅［模型回覆］\n${printJson(text ?? item.content)}`;
+    } else if (item.type === 'function_call') {
       out = `🛠️［呼叫工具：${item.name}］\n${printJson(item.arguments)}`;
-    }
-    else if (item.type === 'function_call_result') {
+    } else if (item.type === 'function_call_result') {
       out = `📩［工具回應：${item.name}］\n${printJson(item.output)}`;
-    }
-    else if (item.type === 'reasoning') {
-      out = `🤔［推理］\n${printJson(item.rawContent[0]['text'])}`;
-    }
-    else {
-      console.log(typeof (item));
+    } else if (item.type === 'reasoning') {
+      const text = getTextFromContent(item.rawContent);
+      out = `🤔［推理］\n${printJson(text ?? item.content)}`;
+    } else {
+      console.log(typeof item);
       out = `🟥［其他］\n${printJson(item)}`;
     }
     console.log(out.substring(0, 200));
@@ -93,10 +123,7 @@ function printResult(result: RunResult<any, Agent<any, any>>) {
 }
 
 export async function askAgent1(message: string): Promise<string> {
-  const result = await run(
-    agent,
-    message,
-  );
+  const result = await run(agent, message);
   printResult(result);
   await tavilyMcpServer.close();
   const response = result.finalOutput!;

@@ -3,8 +3,7 @@ import { z } from 'zod';
 
 export const fetchAgentCardTool = tool({
   name: 'fetch_agent_card',
-  description:
-    'Fetch A2A Agent Card by providing baseURL. baseURL only contains scheme, domain and port(if any).',
+  description: 'Fetch A2A Agent Card by baseURL (include /.well-known/agent-card.json).',
   parameters: z.object({ baseURL: z.string() }),
   execute: async ({ baseURL }) => {
     return await fetchAgentCard(baseURL);

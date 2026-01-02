@@ -1,7 +1,13 @@
 import 'dotenv/config';
 
 import { AGENT_CARD_PATH, type AgentCard, type Message, type TextPart } from '@a2a-js/sdk';
-import { DefaultRequestHandler, InMemoryTaskStore, type RequestContext as A2ARequestContext, type AgentExecutor, type ExecutionEventBus } from '@a2a-js/sdk/server';
+import {
+  DefaultRequestHandler,
+  InMemoryTaskStore,
+  type RequestContext as A2ARequestContext,
+  type AgentExecutor,
+  type ExecutionEventBus,
+} from '@a2a-js/sdk/server';
 import { agentCardHandler, jsonRpcHandler, UserBuilder } from '@a2a-js/sdk/server/express';
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { StreamableHTTPServerTransport } from '@modelcontextprotocol/sdk/server/streamableHttp.js';
@@ -25,15 +31,26 @@ type McpRequestContext = {
 
 const mcpRequestContext = new AsyncLocalStorage<McpRequestContext>();
 
-function tryDecodePaymentHeaderToJson(headerValue: string): any | undefined {
+type X402PaymentHeader = {
+  payload?: {
+    authorization?: {
+      from?: string;
+    };
+  };
+};
+
+function isX402PaymentHeader(value: unknown): value is X402PaymentHeader {
+  return typeof value === 'object' && value !== null && !Array.isArray(value);
+}
+
+function tryDecodePaymentHeaderToJson(headerValue: string): unknown | undefined {
   const encodings: Array<BufferEncoding> = ['base64', 'base64url'];
 
   for (const enc of encodings) {
     try {
       const raw = Buffer.from(headerValue, enc).toString('utf8');
       return JSON.parse(raw);
-    } catch {
-    }
+    } catch {}
   }
   return undefined;
 }
@@ -44,7 +61,7 @@ function getPayerAddressFromX402Header(req: Request): string | undefined {
   if (!headerValue) return undefined;
 
   const decoded = tryDecodePaymentHeaderToJson(headerValue);
-  if (!decoded) return undefined;
+  if (!isX402PaymentHeader(decoded)) return undefined;
 
   const from = decoded?.payload?.authorization?.from;
   return typeof from === 'string' ? from : undefined;
@@ -52,7 +69,10 @@ function getPayerAddressFromX402Header(req: Request): string | undefined {
 
 async function main() {
   const agentId = getAgentId('agent1');
-  if (!agentId) throw new Error('In order to accept feedback from client agent, it\'s required to use `register:a1` first to register the agent on chain!')
+  if (!agentId)
+    throw new Error(
+      "In order to accept feedback from client agent, it's required to use `register:a1` first to register the agent on chain!",
+    );
   const network = NetworkSchema.parse(process.env.CHAIN_NAME);
 
   // ========================================
@@ -81,7 +101,10 @@ async function main() {
       const data = await getCryptoPrice(tokens); // call actual tool
       console.log('----------  ERC-8004 feedbackAuth signed  ----------');
       const payerAddress = mcpRequestContext.getStore()?.payerAddress;
-      const feedbackAuth = await new FeedbackManager(process.env.A1_PRIVATE_KEY!).signFeedbackAuth(agentId, payerAddress!);
+      const feedbackAuth = await new FeedbackManager(process.env.A1_PRIVATE_KEY!).signFeedbackAuth(
+        agentId,
+        payerAddress!,
+      );
       console.log(`Address: ${payerAddress}`);
       console.log(`feedbackAuth: ${feedbackAuth}`);
       console.log('----------  ERC-8004 feedbackAuth signed  ----------\n');
@@ -110,7 +133,10 @@ async function main() {
       const data = await getBlockNumber(); // call actual tool
       console.log('----------  ERC-8004 feedbackAuth signed  ----------');
       const payerAddress = mcpRequestContext.getStore()?.payerAddress;
-      const feedbackAuth = await new FeedbackManager(process.env.A1_PRIVATE_KEY!).signFeedbackAuth(agentId, payerAddress!);
+      const feedbackAuth = await new FeedbackManager(process.env.A1_PRIVATE_KEY!).signFeedbackAuth(
+        agentId,
+        payerAddress!,
+      );
       console.log(`Address: ${payerAddress}`);
       console.log(`feedbackAuth: ${feedbackAuth}`);
       console.log('----------  ERC-8004 feedbackAuth signed  ----------\n');
@@ -169,9 +195,8 @@ async function main() {
 
       eventBus.publish(msg);
       eventBus.finished();
-
     }
-    cancelTask = async () => { }
+    cancelTask = async () => {};
   }
 
   // -----  add a2a agent card  -----
@@ -199,15 +224,14 @@ async function main() {
     capabilities: { pushNotifications: false },
     defaultInputModes: ['text'],
     defaultOutputModes: ['text'],
-  }
-
+  };
 
   // -----  add a2a request handler to deal with http request  -----
   const a2aRequestHandler = new DefaultRequestHandler(
     agentCard,
     new InMemoryTaskStore(),
     new CryptoPriceExecutor(),
-  )
+  );
 
   // ========================================
   // ========================================
@@ -233,37 +257,42 @@ async function main() {
   );
 
   // -----  add mcp endpoint  -----
-  app.post('/mcp', async (req: Request, res: Response, next) => {
-    if (req.body?.method === 'tools/call') { // only charge when tool call (prevent charge on connect ：( )
-      return mcpPayment(req, res, next);
-    }
-    return next();
-  }, async (req: Request, res: Response) => {
-    try {
-      const isToolCall = req.body?.method === 'tools/call';
-      const payerAddress = isToolCall ? getPayerAddressFromX402Header(req) : undefined;
-
-      if (isToolCall) {
-        console.log('----------  x402 payerAddress in header  ----------');
-        console.log(payerAddress);
-        console.log('----------  x402 payerAddress in header  ----------\n');
+  app.post(
+    '/mcp',
+    async (req: Request, res: Response, next) => {
+      if (req.body?.method === 'tools/call') {
+        // only charge when tool call (prevent charge on connect ：( )
+        return mcpPayment(req, res, next);
       }
+      return next();
+    },
+    async (req: Request, res: Response) => {
+      try {
+        const isToolCall = req.body?.method === 'tools/call';
+        const payerAddress = isToolCall ? getPayerAddressFromX402Header(req) : undefined;
 
-      const store: McpRequestContext = payerAddress ? { payerAddress } : {};
-      await mcpRequestContext.run(store, async () => {
-        await transport.handleRequest(req, res, req.body); // use transport to convert mcp <-> http
-      });
-    } catch (error) {
-      console.error('Error handling MCP request:', error);
-      if (!res.headersSent) {
-        res.status(500).json({
-          jsonrpc: '2.0',
-          error: { code: -32603, message: 'Internal server error' },
-          id: null,
+        if (isToolCall) {
+          console.log('----------  x402 payerAddress in header  ----------');
+          console.log(payerAddress);
+          console.log('----------  x402 payerAddress in header  ----------\n');
+        }
+
+        const store: McpRequestContext = payerAddress ? { payerAddress } : {};
+        await mcpRequestContext.run(store, async () => {
+          await transport.handleRequest(req, res, req.body); // use transport to convert mcp <-> http
         });
+      } catch (error) {
+        console.error('Error handling MCP request:', error);
+        if (!res.headersSent) {
+          res.status(500).json({
+            jsonrpc: '2.0',
+            error: { code: -32603, message: 'Internal server error' },
+            id: null,
+          });
+        }
       }
-    }
-  });
+    },
+  );
 
   const a2aPayment = paymentMiddleware(
     process.env.A1_ADDRESS as `0x${string}`,
@@ -277,14 +306,18 @@ async function main() {
   app.use(`/${AGENT_CARD_PATH}`, agentCardHandler({ agentCardProvider: a2aRequestHandler }));
   app.post('/a2a/jsonrpc', (req, res, next) => {
     const m = req.body?.method;
-    if (m === 'message/send' || m === 'message/stream' || m === 'tasks/resubscribe') {  // only charge when task or normal message
+    if (m === 'message/send' || m === 'message/stream' || m === 'tasks/resubscribe') {
+      // only charge when task or normal message
       return a2aPayment(req, res, next);
     }
     return next();
   });
   app.use(
     '/a2a/jsonrpc',
-    jsonRpcHandler({ requestHandler: a2aRequestHandler, userBuilder: UserBuilder.noAuthentication }),
+    jsonRpcHandler({
+      requestHandler: a2aRequestHandler,
+      userBuilder: UserBuilder.noAuthentication,
+    }),
   );
 
   app.listen(PORT, () => {
