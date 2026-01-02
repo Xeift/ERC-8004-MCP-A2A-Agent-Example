@@ -1,3 +1,5 @@
+import 'dotenv/config';
+
 import { Agent, run, tool } from '@openai/agents';
 import { z } from 'zod';
 import { FeedbackManager } from '../../erc-8004/feedback-manager.js';
@@ -41,7 +43,7 @@ async function getImageScore(prompt: string, imageUrl: string) {
   const r = await run(
     new Agent({
       name: 'ImageScorer',
-      model: 'nvidia/nemotron-nano-12b-v2-vl:free',
+      model: process.env.A3_IMAGE_EVAL_MODEL!,
       modelSettings: { temperature: 0 },
       instructions: `根據以下 prompt 評分圖片符合度（0~100），並給 1~3 個簡短原因。\n\nprompt:\n${prompt}`,
       outputType: z.object({

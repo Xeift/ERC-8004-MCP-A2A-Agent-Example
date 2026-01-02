@@ -205,8 +205,8 @@ async function printStreamedOutput(result: AsyncIterable<RunStreamEvent>) {
 const result = await run(
   agent,
   // '幫我產生 ERC-8004 的日報',
-  // '幫我產生一張像素機器人的圖片，prompt 由你設計。',
-  '[暫時性任務] 幫我搜尋關於 image 的 AI Agent，然後選一隻列出他的 endpoint',
+  '幫我產生一張像素機器人的圖片，prompt 由你設計。',
+  // '[暫時性任務] 幫我搜尋關於 image 的 AI Agent，然後選一隻列出他的 endpoint',
   // '[暫時性任務] 幫我拿 http://localhost:3000 的 agent card 然後印出來',
   { stream: true },
 );
