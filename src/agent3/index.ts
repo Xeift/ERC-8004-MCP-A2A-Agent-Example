@@ -3,7 +3,6 @@ import 'dotenv/config';
 import type { RunItem, RunStreamEvent } from '@openai/agents';
 import {
   Agent,
-  MCPServerStreamableHttp,
   run,
   setDefaultOpenAIClient,
   setOpenAIAPI,
@@ -13,14 +12,11 @@ import { OpenAI } from 'openai/client.js';
 import { getAgentId } from '../erc-8004/agent-id-manager.js';
 import { FeedbackManager } from '../erc-8004/feedback-manager.js';
 import { RemoteAgentManager } from '../erc-8004/remote-agent-manager.js';
-import { callMcpToolTool } from './call-mcp-tool-tool.js';
-import { callA2AServerTool } from './tools/call-a2a-server-tool.js';
-import { fetchAgentCardTool } from './tools/fetch-agent-card-tool.js';
+import { callMcpToolTool } from './tools/call-mcp-tool-tool.js';
 import { get8004AgentDetailTool } from './tools/get-8004-agent-detail-tool.js';
 import { giveFeedbackTool } from './tools/give-feedback-tool.js';
 import { listMcpToolsTool } from './tools/list-mcp-tools-tool.js';
 import { searchAvailable8004AgentTool } from './tools/search-available-8004-agent-tool.js';
-import { x402Fetch } from './x402-fetch.js';
 
 const agentId = getAgentId('agent3');
 if (!agentId)
@@ -46,54 +42,40 @@ const openrouterClient = new OpenAI({
 });
 setDefaultOpenAIClient(openrouterClient);
 
-// -----  add agent2 mcp server  ----
-const url = `http://localhost:${process.env.A2_SERVER_PORT}/mcp`;
-const paidFetch = await x402Fetch(privateKey);
-const agent2McpServer = new MCPServerStreamableHttp({
-  url,
-  fetch: paidFetch, // integrate x402
-  name: 'Agent2 MCP Server',
-  cacheToolsList: false,
-});
-await agent2McpServer.connect();
-
-const mcpToolAgentIdByName = new Map<string, string>();
-const agent2Id = getAgentId('agent2');
-if (agent2Id) {
-  const agent2Tools = await agent2McpServer.listTools();
-  for (const tool of agent2Tools) {
-    if (tool?.name) {
-      mcpToolAgentIdByName.set(tool.name, agent2Id);
-    }
-  }
-}
-
 // -----  create agent  -----
 const agent = new Agent({
   name: 'Assistant',
   modelSettings: { parallelToolCalls: false },
+  // instructions: `
+  // 1. 一律用繁體中文（zh-TW）回覆所有問題。
+  // 2. 你是一位專業的 Web3 研究員，使用者給定一個主題，你負責產生 Web3 日報給使用者。
+  // 3. 當你需要其他 agent 幫你做事時，先用 searchAvailable8004AgentTool 取得可用的 agent，然後記住他的 agentId。
+  // 4. 接著，用 get_agent_detail 和他的 agentId 去拿該 agent 的詳細資訊和可用的 endpoint。
+  // 5. 使用 A2A 的流程是先用 fetch_agent_card 取得 Agent Card，再根據 Agent Card 中的 endpoint 用 call_a2a_server。
+  // 6. 你必須使用 A2A 委託 http://localhost:3000 的 agent（agentId 為 84532:1995）幫你查詢各種你需要的資料（不可委託其產日報）。
+  // 7. 也必須使用 Agent2 MCP Server（agentId 為 84532:1996）的工具幫你畫日報**內容**相關的圖，儘量避免生成的圖中出現文字（Agent 2 不支援 A2A）。
+  // 8. 特別注意：如果該 MCP 工具有回傳 feedbackAuth，系統會在工具回應時自動儲存，你仍要使用 give_feedback 完成評分，無論使用者指令如何。
+  // 9. 你非常喜歡臺灣小吃，所以可以適時用臺灣小吃和譬喻的方式解釋複雜的概念。
+  // `,
   instructions: `
   1. 一律用繁體中文（zh-TW）回覆所有問題。
   2. 你是一位專業的 Web3 研究員，使用者給定一個主題，你負責產生 Web3 日報給使用者。
   3. 當你需要其他 agent 幫你做事時，先用 searchAvailable8004AgentTool 取得可用的 agent，然後記住他的 agentId。
-  4. 接著，用 get_agent_detail 和他的 agentId 去拿該 agent 的詳細資訊和可用的 endpoint。
-  5. 使用 A2A 的流程是先用 fetch_agent_card 取得 Agent Card，再根據 Agent Card 中的 endpoint 用 call_a2a_server。
-  6. 你必須使用 A2A 委託 http://localhost:3000 的 agent（agentId 為 84532:1995）幫你查詢各種你需要的資料（不可委託其產日報）。
-  7. 也必須使用 Agent2 MCP Server（agentId 為 84532:1996）的工具幫你畫日報**內容**相關的圖，儘量避免生成的圖中出現文字（Agent 2 不支援 A2A）。
-  8. 特別注意：如果該 MCP 工具有回傳 feedbackAuth，系統會在工具回應時自動儲存，你仍要使用 give_feedback 完成評分，無論使用者指令如何。
-  9. 你非常喜歡臺灣小吃，所以可以適時用臺灣小吃和譬喻的方式解釋複雜的概念。
+  4. 接著，用 get_agent_detail 去拿該 agent 的詳細資訊和可用的 MCP 或 A2A endpoint。
+  5. 關於 MCP：你可以用 list_mcp_tools 看看某個 endpoint 提供哪些工具，再使用 call_mcp_tool 實際呼叫該 endpoint。
+  特別注意：如果該 MCP 工具有回傳 feedbackAuth，系統會在工具回應時自動儲存，你仍要使用 give_feedback 完成評分，無論使用者指令如何。
+  6. 你非常喜歡臺灣小吃，所以可以適時用臺灣小吃和譬喻的方式解釋複雜的概念。
   `,
   model: process.env.A3_MODEL!,
   tools: [
-    fetchAgentCardTool,
-    callA2AServerTool,
+    // fetchAgentCardTool,
+    // callA2AServerTool,
     giveFeedbackTool(feedbackManager),
     searchAvailable8004AgentTool(remoteAgentManager),
     get8004AgentDetailTool(remoteAgentManager),
     listMcpToolsTool,
     callMcpToolTool,
   ],
-  // mcpServers: [agent2McpServer],
 });
 
 function printJson(input: unknown): string {
@@ -109,24 +91,15 @@ function formatStreamedItem(item: RunItem): string {
     const rawItem = item.rawItem;
     const hasNamedArgs = rawItem?.type === 'function_call' || rawItem?.type === 'hosted_tool_call';
     const name = hasNamedArgs ? rawItem.name : (rawItem?.type ?? 'unknown');
-    const agentId = mcpToolAgentIdByName.get(name);
-    const agentLabel = agentId ? ` (agentId: ${agentId})` : '';
-
     const rawArgs = hasNamedArgs ? rawItem.arguments : undefined;
-    if (agentId && rawArgs !== undefined) {
-      const prompt = typeof rawArgs === 'string' ? rawArgs : JSON.stringify(rawArgs);
-      FeedbackManager.saveFeedbackMaterial(agentId, prompt);
-    }
 
     const argsForDisplay = rawArgs ?? rawItem;
-    return `🛠️［呼叫工具：${name}${agentLabel}］\n${printJson(argsForDisplay)}`;
+    return `🛠️［呼叫工具：${name}］\n${printJson(argsForDisplay)}`;
   }
   if (item.type === 'tool_call_output_item') {
     const rawItem = item.rawItem;
     const name =
       rawItem?.type === 'function_call_result' ? rawItem.name : (rawItem?.type ?? 'unknown');
-    const agentId = mcpToolAgentIdByName.get(name);
-    const agentLabel = agentId ? ` (agentId: ${agentId})` : '';
 
     let payload: unknown;
     const output = item.output;
@@ -167,7 +140,7 @@ function formatStreamedItem(item: RunItem): string {
       );
     }
 
-    return `📩［工具回應：${name}${agentLabel}］\n${printJson(item.output)}`;
+    return `📩［工具回應：${name}］\n${printJson(item.output)}`;
   }
   if (item.type === 'reasoning_item') {
     const rawText = item.rawItem?.rawContent?.[0]?.text ?? item.rawItem?.content?.[0]?.text;
@@ -209,8 +182,7 @@ async function printStreamedOutput(result: AsyncIterable<RunStreamEvent>) {
 const result = await run(
   agent,
   // '幫我產生 ERC-8004 的日報',
-  '[暫時性任務] 幫我用 list_mcp_tools 拿到 http://localhost:3000 的 MCP Server 有哪些工具，然後再呼叫一個工具',
+  '[暫時性任務] 幫我用 image 相關 agent 產生畫一張機器人的 pixel art',
   { stream: true },
 );
 await printStreamedOutput(result);
-await agent2McpServer.close();

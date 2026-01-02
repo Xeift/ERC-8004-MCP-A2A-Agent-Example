@@ -1,6 +1,8 @@
 import { MCPServerStreamableHttp, tool } from '@openai/agents';
 import { z } from 'zod';
-import { x402Fetch } from './x402-fetch.js';
+import { FeedbackManager } from '../../erc-8004/feedback-manager.js';
+import { getAgentIdByBaseUrl } from '../../erc-8004/remote-agent-manager.js';
+import { x402Fetch } from '../x402-fetch.js';
 
 type MCPContentItem = {
   type?: string;
@@ -29,7 +31,7 @@ export const callMcpToolTool = tool({
   parameters: z.object({
     baseURL: z.string(),
     toolName: z.string(),
-    toolArgs: z.record(z.any()).nullable(),
+    toolArgs: z.union([z.record(z.any()), z.string()]).nullable(),
   }),
   execute: async ({ baseURL, toolName, toolArgs }) => {
     const privateKey = process.env.A3_PRIVATE_KEY;
@@ -45,8 +47,23 @@ export const callMcpToolTool = tool({
 
     await server.connect();
     try {
-      const content = await server.callTool(toolName, toolArgs ?? {});
+      let resolvedArgs: Record<string, unknown> = {};
+      if (toolArgs) {
+        if (typeof toolArgs === 'string') {
+          const parsed = JSON.parse(toolArgs);
+          if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) {
+            throw new Error('toolArgs string must be a JSON object');
+          }
+          resolvedArgs = parsed as Record<string, unknown>;
+        } else {
+          resolvedArgs = toolArgs;
+        }
+      }
+      const content = await server.callTool(toolName, resolvedArgs);
       const structuredContent = parseStructuredContent(content);
+      const agentId = getAgentIdByBaseUrl(baseURL);
+      FeedbackManager.saveFeedbackMaterial(agentId, JSON.stringify(toolArgs));
+
       return { baseURL, toolName, content, structuredContent };
     } finally {
       await server.close();
