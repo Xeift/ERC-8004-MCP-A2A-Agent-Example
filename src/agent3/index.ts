@@ -13,10 +13,12 @@ import { OpenAI } from 'openai/client.js';
 import { getAgentId } from '../erc-8004/agent-id-manager.js';
 import { FeedbackManager } from '../erc-8004/feedback-manager.js';
 import { RemoteAgentManager } from '../erc-8004/remote-agent-manager.js';
+import { callMcpToolTool } from './call-mcp-tool-tool.js';
 import { callA2AServerTool } from './tools/call-a2a-server-tool.js';
 import { fetchAgentCardTool } from './tools/fetch-agent-card-tool.js';
-import { get8004AgentDetailTool } from './tools/get-8004-agent-detail-tool.ts.js';
+import { get8004AgentDetailTool } from './tools/get-8004-agent-detail-tool.js';
 import { giveFeedbackTool } from './tools/give-feedback-tool.js';
+import { listMcpToolsTool } from './tools/list-mcp-tools-tool.js';
 import { searchAvailable8004AgentTool } from './tools/search-available-8004-agent-tool.js';
 import { x402Fetch } from './x402-fetch.js';
 
@@ -88,8 +90,10 @@ const agent = new Agent({
     giveFeedbackTool(feedbackManager),
     searchAvailable8004AgentTool(remoteAgentManager),
     get8004AgentDetailTool(remoteAgentManager),
+    listMcpToolsTool,
+    callMcpToolTool,
   ],
-  mcpServers: [agent2McpServer],
+  // mcpServers: [agent2McpServer],
 });
 
 function printJson(input: unknown): string {
@@ -205,9 +209,7 @@ async function printStreamedOutput(result: AsyncIterable<RunStreamEvent>) {
 const result = await run(
   agent,
   // '幫我產生 ERC-8004 的日報',
-  '幫我產生一張像素機器人的圖片，prompt 由你設計。',
-  // '[暫時性任務] 幫我搜尋關於 image 的 AI Agent，然後選一隻列出他的 endpoint',
-  // '[暫時性任務] 幫我拿 http://localhost:3000 的 agent card 然後印出來',
+  '[暫時性任務] 幫我用 list_mcp_tools 拿到 http://localhost:3000 的 MCP Server 有哪些工具，然後再呼叫一個工具',
   { stream: true },
 );
 await printStreamedOutput(result);
