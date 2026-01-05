@@ -28,8 +28,12 @@ const PORT = process.env.A1_SERVER_PORT;
 type McpRequestContext = {
   payerAddress?: string;
 };
-
 const mcpRequestContext = new AsyncLocalStorage<McpRequestContext>();
+
+type A2aRequestContext = {
+  payerAddress?: string;
+};
+const a2aRequestContext = new AsyncLocalStorage<A2aRequestContext>();
 
 type X402PaymentHeader = {
   payload?: {
@@ -169,6 +173,16 @@ async function main() {
   // -----  add a2a agent executor to reply the request  -----
   class CryptoPriceExecutor implements AgentExecutor {
     async execute(requestContext: A2ARequestContext, eventBus: ExecutionEventBus): Promise<void> {
+      console.log('----------  ERC-8004 feedbackAuth signed  ----------');
+      const payerAddress = a2aRequestContext.getStore()?.payerAddress;
+      const feedbackAuth = await new FeedbackManager(process.env.A1_PRIVATE_KEY!).signFeedbackAuth(
+        agentId!,
+        payerAddress!,
+      );
+      console.log(`Address: ${payerAddress}`);
+      console.log(`feedbackAuth: ${feedbackAuth}`);
+      console.log('----------  ERC-8004 feedbackAuth signed  ----------\n');
+
       const parts = requestContext.userMessage?.parts ?? [];
 
       let userText = '';
@@ -184,13 +198,16 @@ async function main() {
       console.log('----------  server: received remote request  ----------\n');
 
       const response = await askAgent1(userText);
-
+      const payload = { feedbackAuth, result: response };
       const msg: Message = {
         kind: 'message',
         messageId: uuidv4(),
         role: 'agent',
         contextId: requestContext.contextId,
-        parts: [{ kind: 'text', text: response }],
+        parts: [
+          { kind: 'text', text: response },
+          { kind: 'data', data: payload }, // there's no structuredContent in a2a so we use 'data' part
+        ],
       };
 
       eventBus.publish(msg);
@@ -249,6 +266,7 @@ async function main() {
       'POST /mcp': {
         price: '$0.002',
         network: network,
+        config: { maxTimeoutSeconds: 180 },
       },
     },
     {
@@ -304,14 +322,48 @@ async function main() {
 
   // -----  add a2a endpoint  -----
   app.use(`/${AGENT_CARD_PATH}`, agentCardHandler({ agentCardProvider: a2aRequestHandler }));
-  app.post('/a2a/jsonrpc', (req, res, next) => {
-    const m = req.body?.method;
-    if (m === 'message/send' || m === 'message/stream' || m === 'tasks/resubscribe') {
-      // only charge when task or normal message
-      return a2aPayment(req, res, next);
-    }
-    return next();
-  });
+  app.post(
+    '/a2a/jsonrpc',
+    async (req, res, next) => {
+      const method = req.body?.method;
+      const isPaidRequest =
+        method === 'message/send' || method === 'message/stream' || method === 'tasks/resubscribe';
+      if (isPaidRequest) {
+        // only charge when task or normal message
+        return a2aPayment(req, res, next);
+      }
+      return next();
+    },
+    async (req, res, next) => {
+      try {
+        const method = req.body?.method;
+        const isPaidRequest =
+          method === 'message/send' ||
+          method === 'message/stream' ||
+          method === 'tasks/resubscribe';
+        const payerAddress = isPaidRequest ? getPayerAddressFromX402Header(req) : undefined;
+
+        if (isPaidRequest) {
+          console.log('----------  x402 payerAddress in header  ----------');
+          console.log(method);
+          console.log(payerAddress);
+          console.log('----------  x402 payerAddress in header  ----------\n');
+        }
+
+        const store: A2aRequestContext = payerAddress ? { payerAddress } : {};
+        return a2aRequestContext.run(store, () => next());
+      } catch (error) {
+        console.error('Error handling A2A request:', error);
+        if (!res.headersSent) {
+          res.status(500).json({
+            jsonrpc: '2.0',
+            error: { code: -32603, message: 'Internal server error' },
+            id: null,
+          });
+        }
+      }
+    },
+  );
   app.use(
     '/a2a/jsonrpc',
     jsonRpcHandler({

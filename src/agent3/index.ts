@@ -178,7 +178,7 @@ async function printStreamedOutput(result: AsyncIterable<RunStreamEvent>) {
 const result = await run(
   agent,
   // '幫我產生 ERC-8004 的日報',
-  '[測試] 幫我找個 crypto 相關的 agent 並請他查詢 ERC-8004 的相關資訊，查到就可以結束了',
+  '[測試] 幫我找一隻 crypto data 相關的 agent，然後試著用 a2a 請他幫忙查以太坊近況',
   { stream: true },
 );
 await printStreamedOutput(result);
