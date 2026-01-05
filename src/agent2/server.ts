@@ -19,8 +19,19 @@ type RequestContext = {
 
 const requestContext = new AsyncLocalStorage<RequestContext>();
 
+type X402PaymentHeader = {
+  payload?: {
+    authorization?: {
+      from?: string;
+    };
+  };
+};
 
-function tryDecodePaymentHeaderToJson(headerValue: string): any | undefined {
+function isX402PaymentHeader(value: unknown): value is X402PaymentHeader {
+  return typeof value === 'object' && value !== null && !Array.isArray(value);
+}
+
+function tryDecodePaymentHeaderToJson(headerValue: string): unknown | undefined {
   const encodings: Array<BufferEncoding> = ['base64', 'base64url'];
 
   for (const enc of encodings) {
@@ -39,7 +50,7 @@ function getPayerAddressFromX402Header(req: Request): string | undefined {
   if (!headerValue) return undefined;
 
   const decoded = tryDecodePaymentHeaderToJson(headerValue);
-  if (!decoded) return undefined;
+  if (!isX402PaymentHeader(decoded)) return undefined;
 
   const from = decoded?.payload?.authorization?.from;
   return typeof from === 'string' ? from : undefined;
