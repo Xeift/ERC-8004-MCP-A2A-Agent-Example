@@ -25,16 +25,22 @@ function parseRegistrationRecord(registrationFile: unknown): Record<string, unkn
   return registrationFile as Record<string, unknown>;
 }
 
-function extractMcpBaseUrlFromRegistration(record: Record<string, unknown>): string | undefined {
+function extractEndpointBaseUrlFromRegistration(
+  record: Record<string, unknown>,
+  type: string,
+): string | undefined {
   const endpoints = Array.isArray(record.endpoints) ? record.endpoints : [];
   const target = endpoints.find(
-    (endpoint) => (endpoint as EndpointRecord | undefined)?.type === 'MCP',
+    (endpoint) => (endpoint as EndpointRecord | undefined)?.type === type,
   );
   const value =
     target && typeof target === 'object' && !Array.isArray(target)
       ? (target as EndpointRecord).value
       : undefined;
-  return typeof value === 'string' ? value : undefined;
+  if (typeof value !== 'string') return undefined;
+  else if (type === 'A2A') return new URL(value).origin;
+  // important: only save origin instead of agent card url
+  else return undefined;
 }
 
 export function getAgentIdByBaseUrl(baseUrl: string): string | undefined {
@@ -90,8 +96,9 @@ export class RemoteAgentManager {
 
     const registrationRecord = parseRegistrationRecord(registrationFile);
     if (registrationRecord) {
-      const mcpBaseUrl = extractMcpBaseUrlFromRegistration(registrationRecord);
-      if (mcpBaseUrl) {
+      const mcpBaseUrl = extractEndpointBaseUrlFromRegistration(registrationRecord, 'MCP');
+      const a2aBaseUrl = extractEndpointBaseUrlFromRegistration(registrationRecord, 'A2A');
+      if (mcpBaseUrl || a2aBaseUrl) {
         const domainMapPath = join(import.meta.dirname, 'base-url-to-agent-id.json');
         let domainMap: Record<string, string> = {};
         if (existsSync(domainMapPath)) {
@@ -104,7 +111,9 @@ export class RemoteAgentManager {
           } catch {}
         }
 
-        domainMap[mcpBaseUrl] = agentId;
+        if (mcpBaseUrl) domainMap[mcpBaseUrl] = agentId;
+        if (a2aBaseUrl) domainMap[a2aBaseUrl] = agentId;
+
         writeFileSync(domainMapPath, JSON.stringify(domainMap, null, 2), 'utf-8');
       }
     }

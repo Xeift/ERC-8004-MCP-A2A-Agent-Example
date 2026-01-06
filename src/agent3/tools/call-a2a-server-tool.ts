@@ -1,7 +1,10 @@
+import type { Message, Task } from '@a2a-js/sdk';
 import { ClientFactory, ClientFactoryOptions, JsonRpcTransportFactory } from '@a2a-js/sdk/client';
 import { tool } from '@openai/agents';
 import { v4 as uuidv4 } from 'uuid';
 import { z } from 'zod';
+import { FeedbackManager } from '../../erc-8004/feedback-manager.js';
+import { getAgentIdByBaseUrl } from '../../erc-8004/remote-agent-manager.js';
 import { x402Fetch } from '../x402-fetch.js';
 
 export const callA2AServerTool = tool({
@@ -35,5 +38,54 @@ async function callA2AServer(baseUrl: string, message: string): Promise<string> 
     },
   });
 
+  const agentId = getAgentIdByBaseUrl(baseUrl);
+
+  const { feedbackAuthRet, resultRet } = parseTextAndData(result);
+  FeedbackManager.saveFeedbackMaterial(
+    agentId,
+    message,
+    undefined,
+    undefined,
+    undefined,
+    feedbackAuthRet,
+    resultRet,
+  );
+
   return JSON.stringify(result, null, 2);
+}
+
+function parseTextAndData(result: Message | Task) {
+  let feedbackAuthRet: string | undefined;
+  let resultRet: string | undefined;
+
+  console.log(result.kind);
+  console.log(result.kind != 'message');
+  console.log(result.kind !== 'message');
+  if (result.kind !== 'message') {
+    return { feedbackAuthRet: undefined, resultRet: undefined };
+  }
+
+  let text: string | undefined;
+  let data: Record<string, unknown> | undefined;
+  const parts = result.parts;
+  for (const part of parts) {
+    if (part.kind === 'data') {
+      data = part.data;
+    } else if (part.kind === 'text') {
+      text = part.text;
+    }
+  }
+
+  if (data) {
+    if (typeof data.feedbackAuth == 'string') feedbackAuthRet = data.feedbackAuth;
+    if (typeof data.result == 'string') resultRet = data.result;
+  } else if (text) {
+    try {
+      const parsedText = JSON.parse(text);
+      if (typeof parsedText.feedbackAuth == 'string') feedbackAuthRet = parsedText.feedbackAuth;
+      if (typeof parsedText.result == 'string') resultRet = parsedText.result;
+    } catch {}
+  }
+
+  return { feedbackAuthRet, resultRet };
 }

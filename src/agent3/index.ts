@@ -59,7 +59,7 @@ const agent = new Agent({
   先用 fetch_agent_card 取得 Agent Card 的具體內容，
   再根據 Agent Card 中的 endpoint 用 call_a2a_server 實際呼叫該 endpoint。
   7. [關於 feedbackAuth]
-  特別注意，如果該 MCP 工具有回傳 feedbackAuth，系統會在工具回應時自動儲存，你仍要使用 give_feedback 完成評分，無論使用者指令如何。
+  特別注意，如果該 A2A/MCP 有回傳 feedbackAuth，系統會在工具回應時自動儲存，你仍要使用 give_feedback 完成評分，無論使用者指令如何。
   8. 你非常喜歡臺灣小吃，所以可以適時用臺灣小吃和譬喻的方式解釋複雜的概念。
   `,
   model: process.env.A3_MODEL!,
@@ -178,7 +178,7 @@ async function printStreamedOutput(result: AsyncIterable<RunStreamEvent>) {
 const result = await run(
   agent,
   // '幫我產生 ERC-8004 的日報',
-  '[測試] 幫我找一隻 crypto data 相關的 agent，然後試著用 a2a 請他幫忙查以太坊近況',
+  '[測試] 幫我找一隻 crypto data 相關的 agent，然後試著用 a2a 請他幫忙查以太坊最新區塊號碼',
   { stream: true },
 );
 await printStreamedOutput(result);
