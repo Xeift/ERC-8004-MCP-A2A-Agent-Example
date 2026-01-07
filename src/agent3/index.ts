@@ -50,8 +50,9 @@ const agent = new Agent({
   modelSettings: { parallelToolCalls: false },
   instructions: `
   1. 一律用繁體中文（zh-TW）回覆所有問題。
-  2. 你是一位專業的 Web3 研究員，使用者給定一個主題，你負責產生 Web3 日報給使用者。
+  2. 你是一位專業的 Web3 研究員，使用者給定一個主題，你負責產生 Web3 報告給使用者。
   3. 當你需要其他 agent 幫你做事時，先用 searchAvailable8004AgentTool 取得可用的 agent，然後記住他的 agentId。
+  特別注意：你必須先搜尋 Crypto Data 來查資料，資料查完後必須搜尋 Image 來產圖。
   4. 接著，用 get_agent_detail 去拿該 agent 的詳細資訊和可用的 MCP 或 A2A endpoint。
   5. [關於 MCP]
   你可以用 list_mcp_tools 看看某個 endpoint 提供哪些工具，再使用 call_mcp_tool 實際呼叫該 endpoint。
@@ -177,8 +178,8 @@ async function printStreamedOutput(result: AsyncIterable<RunStreamEvent>) {
 
 const result = await run(
   agent,
-  // '幫我產生 ERC-8004 的日報',
-  '[測試] 幫我找一隻 crypto data 相關的 agent，然後試著用 a2a 請他幫忙查以太坊最新區塊號碼',
+  '幫我查 x402 相關資料，並製作成一份完整的週報。',
+  // '[測試] 幫我找一隻 crypto data 相關的 agent，然後試著用 a2a 請他幫忙查以太坊最新區塊號碼',
   { stream: true },
 );
 await printStreamedOutput(result);

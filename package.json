@@ -13,7 +13,8 @@
     "agent:a3": "npm run build && node dist/agent3/index.js",
     "register:a1": "npm run build && node dist/erc-8004/register-agent1.js",
     "register:a2": "npm run build && node dist/erc-8004/register-agent2.js",
-    "register:a3": "npm run build && node dist/erc-8004/register-agent3.js"
+    "register:a3": "npm run build && node dist/erc-8004/register-agent3.js",
+    "update": "npm run build && node dist/erc-8004/update-agent.js"
   },
   "keywords": [],
   "author": "",
