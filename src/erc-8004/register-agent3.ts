@@ -5,18 +5,18 @@ import { saveAgentId } from './agent-id-manager.js';
 
 // Initialize SDK with IPFS and subgraph
 const sdk = new SDK({
-    chainId: Number(process.env.CHAIN_ID),
-    rpcUrl: process.env.RPC_URL!,
-    signer: process.env.A3_PRIVATE_KEY!,
-    ipfs: 'pinata',
-    pinataJwt: process.env.PINATA_JWT!,
+  chainId: Number(process.env.CHAIN_ID),
+  rpcUrl: process.env.RPC_URL!,
+  signer: process.env.A3_PRIVATE_KEY!,
+  ipfs: 'pinata',
+  pinataJwt: process.env.PINATA_JWT!,
 });
 
 // Create agent
 const agent = sdk.createAgent(
-    'Web3 News Assistant',
-    'A client agent that generates a daily report for a given topic by orchestrating external A2A agents for live crypto/on-chain data retrieval and image generation, then synthesizing the results into a concise, reader-friendly summary. Supports ERC-8004, A2A client and MCP client.',
-    'https://raw.githubusercontent.com/Xeift/ERC-8004-MCP-A2A-Agent-Example/refs/heads/develop/src/agent3/agent3_pfp.png'
+  'Web3 News Assistant',
+  'A client agent that generates a daily report for a given topic by orchestrating external A2A agents for live crypto/on-chain data retrieval and image generation, then synthesizing the results into a concise, reader-friendly summary. Supports ERC-8004, A2A client and MCP client.',
+  'https://raw.githubusercontent.com/Xeift/ERC-8004-MCP-A2A-Agent-Example/refs/heads/develop/src/agent3/agent3_pfp.png',
 );
 
 // Configure endpoints (automatically extracts capabilities)
@@ -25,7 +25,10 @@ agent.setENS('agent00003.eth');
 
 // Add OASF skills and domains (standardized taxonomies)
 agent.addSkill('natural_language_processing/natural_language_generation/summarization', true);
-agent.addSkill('natural_language_processing/information_retrieval_synthesis/knowledge_synthesis', true);
+agent.addSkill(
+  'natural_language_processing/information_retrieval_synthesis/knowledge_synthesis',
+  true,
+);
 agent.addSkill('natural_language_processing/information_retrieval_synthesis/search', true);
 agent.addSkill('tool_interaction/api_schema_understanding', true);
 agent.addSkill('tool_interaction/tool_use_planning', true);
@@ -59,10 +62,7 @@ agent.setActive(true);
 const registrationFile = await agent.registerIPFS();
 console.log('----------  Agent3 Registered  ----------');
 console.log(`Agent registered: ${registrationFile.agentId}`);
-console.log(`Agent URI: ${registrationFile.agentURI?.replace(
-    'ipfs://',
-    'https://ipfs.io/ipfs/'
-)}`);
-saveAgentId('agent3', registrationFile.agentId!)
+console.log(`Agent URI: ${registrationFile.agentURI?.replace('ipfs://', 'https://ipfs.io/ipfs/')}`);
+saveAgentId('agent3', registrationFile.agentId!);
 console.log('AgentId has been saved to agent-id.json');
 console.log('----------  Agent3 Registered  ----------');

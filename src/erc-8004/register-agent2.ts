@@ -6,18 +6,18 @@ import { saveAgentId } from './agent-id-manager.js';
 
 // Initialize SDK with IPFS and subgraph
 const sdk = new SDK({
-    chainId: Number(process.env.CHAIN_ID),
-    rpcUrl: process.env.RPC_URL!,
-    signer: process.env.A2_PRIVATE_KEY!,
-    ipfs: 'pinata',
-    pinataJwt: process.env.PINATA_JWT!,
+  chainId: Number(process.env.CHAIN_ID),
+  rpcUrl: process.env.RPC_URL!,
+  signer: process.env.A2_PRIVATE_KEY!,
+  ipfs: 'pinata',
+  pinataJwt: process.env.PINATA_JWT!,
 });
 
 // Create agent
 const agent = sdk.createAgent(
-    'Image Generation Agent',
-    'Image Generation Agent is a minimal MCP agent that generates an image from a text prompt, uploads it to an image hosting service, and returns the image URL over HTTP. Supports ERC-8004 and MCP.',
-    'https://raw.githubusercontent.com/Xeift/ERC-8004-MCP-A2A-Agent-Example/refs/heads/develop/src/agent2/agent2_pfp.png'
+  'Image Generation Agent',
+  'Image Generation Agent is a minimal MCP agent that generates an image from a text prompt, uploads it to an image hosting service, and returns the image URL over HTTP. Supports ERC-8004 and MCP.',
+  'https://raw.githubusercontent.com/Xeift/ERC-8004-MCP-A2A-Agent-Example/refs/heads/develop/src/agent2/agent2_pfp.png',
 );
 
 // Configure endpoints (automatically extracts capabilities)
@@ -46,10 +46,7 @@ agent.setActive(true);
 const registrationFile = await agent.registerIPFS();
 console.log('----------  Agent2 Registered  ----------');
 console.log(`Agent registered: ${registrationFile.agentId}`);
-console.log(`Agent URI: ${registrationFile.agentURI?.replace(
-    'ipfs://',
-    'https://ipfs.io/ipfs/'
-)}`);
-saveAgentId('agent2', registrationFile.agentId!)
+console.log(`Agent URI: ${registrationFile.agentURI?.replace('ipfs://', 'https://ipfs.io/ipfs/')}`);
+saveAgentId('agent2', registrationFile.agentId!);
 console.log('AgentId has been saved to agent-id.json');
 console.log('----------  Agent2 Registered  ----------');
