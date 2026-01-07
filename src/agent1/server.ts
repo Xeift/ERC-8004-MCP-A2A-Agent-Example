@@ -315,7 +315,11 @@ async function main() {
   const a2aPayment = paymentMiddleware(
     process.env.A1_ADDRESS as `0x${string}`,
     {
-      'POST /a2a/jsonrpc': { price: '$0.002', network },
+      'POST /a2a/jsonrpc': {
+        price: '$0.002',
+        network,
+        config: { maxTimeoutSeconds: 180 },
+      },
     },
     { url: process.env.FACILITATOR_URL as Resource },
   );
