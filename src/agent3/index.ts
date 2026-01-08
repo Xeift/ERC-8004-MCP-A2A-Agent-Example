@@ -183,6 +183,6 @@ const result = await run(
   agent,
   '幫我查 x402 Protocol 相關資料，並製作成一份完整的週報。',
   // '[測試] 幫我找一隻 crypto data 相關的 agent，然後試著用 a2a 請他幫忙查以太坊最新區塊號碼',
-  { stream: true },
+  { stream: true, maxTurns: 20 },
 );
 await printStreamedOutput(result);
