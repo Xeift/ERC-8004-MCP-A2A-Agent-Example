@@ -58,9 +58,6 @@ function parseTextAndData(result: Message | Task) {
   let feedbackAuthRet: string | undefined;
   let resultRet: string | undefined;
 
-  console.log(result.kind);
-  console.log(result.kind != 'message');
-  console.log(result.kind !== 'message');
   if (result.kind !== 'message') {
     return { feedbackAuthRet: undefined, resultRet: undefined };
   }
