@@ -125,7 +125,16 @@ function printResult(result: AgentRunResult) {
 export async function askAgent1(message: string): Promise<string> {
   const result = await run(agent, message);
   printResult(result);
-  await tavilyMcpServer.close();
   const response = result.finalOutput!;
   return response;
 }
+
+// only close when stop script, prevent "Error: Server not initialized" error
+process.on('SIGINT', async () => {
+  await tavilyMcpServer.close();
+  process.exit(0);
+});
+process.on('SIGTERM', async () => {
+  await tavilyMcpServer.close();
+  process.exit(0);
+});
