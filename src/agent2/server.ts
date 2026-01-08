@@ -2,16 +2,18 @@ import 'dotenv/config';
 
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { StreamableHTTPServerTransport } from '@modelcontextprotocol/sdk/server/streamableHttp.js';
+import type { Transport } from '@modelcontextprotocol/sdk/shared/transport.js';
+import { HTTPFacilitatorClient, x402ResourceServer } from '@x402/core/server';
+import type { Network } from '@x402/core/types';
+import { registerExactEvmScheme } from '@x402/evm/exact/server';
+import { paymentMiddleware } from '@x402/express';
 import { AsyncLocalStorage } from 'async_hooks';
 import express, { type Request, type Response } from 'express';
-import { paymentMiddleware, type Resource } from 'x402-express';
-import { NetworkSchema } from 'x402/types';
 import { z } from 'zod';
 import { getAgentId } from '../erc-8004/agent-id-manager.js';
 import { FeedbackManager } from '../erc-8004/feedback-manager.js';
 import { generateImage } from './generate-image.js';
 import { uploadImgbb } from './upload-imgbb.js';
-
 
 type RequestContext = {
   payerAddress?: string;
@@ -38,8 +40,7 @@ function tryDecodePaymentHeaderToJson(headerValue: string): unknown | undefined 
     try {
       const raw = Buffer.from(headerValue, enc).toString('utf8');
       return JSON.parse(raw);
-    } catch {
-    }
+    } catch {}
   }
   return undefined;
 }
@@ -58,8 +59,19 @@ function getPayerAddressFromX402Header(req: Request): string | undefined {
 
 async function main() {
   const agentId = getAgentId('agent2');
-  if (!agentId) throw new Error('In order to accept feedback from client agent, it\'s required to use `register:a2` first to register the agent on chain!')
-  const network = NetworkSchema.parse(process.env.CHAIN_NAME);
+  if (!agentId)
+    throw new Error(
+      "In order to accept feedback from client agent, it's required to use `register:a2` first to register the agent on chain!",
+    );
+  const network = `eip155:${process.env.CHAIN_ID}` as Network;
+  const facilitatorUrl = process.env.FACILITATOR_URL;
+  if (!network) throw new Error('Missing CHAIN_ID in .env');
+  if (!facilitatorUrl) throw new Error('Missing FACILITATOR_URL in .env');
+
+  const facilitator = new HTTPFacilitatorClient({ url: facilitatorUrl });
+  const resourceServer = registerExactEvmScheme(new x402ResourceServer(facilitator), {
+    networks: [network],
+  });
 
   // -----  create mcp server  -----
   const mcpServer = new McpServer({
@@ -72,9 +84,12 @@ async function main() {
     'generate_image',
     {
       title: 'Generate image',
-      description: 'Generate image from a given prompt. Return a generated image URL and a ERC-8004 feedbackAuth.',
+      description:
+        'Generate image from a given prompt. Return a generated image URL and a ERC-8004 feedbackAuth.',
       inputSchema: {
-        prompt: z.string().describe('The prompt to generate the image. e.g.: A cute robot, pixel_art'),
+        prompt: z
+          .string()
+          .describe('The prompt to generate the image. e.g.: A cute robot, pixel_art'),
       },
     },
     async ({ prompt }) => {
@@ -89,7 +104,10 @@ async function main() {
 
       console.log('----------  ERC-8004 feedbackAuth signed  ----------');
       const payerAddress = requestContext.getStore()?.payerAddress; // read the previous saved payerAddress from store
-      const feedbackAuth = await new FeedbackManager(process.env.A2_PRIVATE_KEY!).signFeedbackAuth(agentId, payerAddress!);
+      const feedbackAuth = await new FeedbackManager(process.env.A2_PRIVATE_KEY!).signFeedbackAuth(
+        agentId,
+        payerAddress!,
+      );
       console.log(`Address: ${payerAddress}`);
       console.log(`feedbackAuth: ${feedbackAuth}`);
       console.log('----------  ERC-8004 feedbackAuth signed  ----------\n');
@@ -108,60 +126,65 @@ async function main() {
   );
 
   // -----  convert http <-> mcp  -----
-  const transport = new StreamableHTTPServerTransport({
-    sessionIdGenerator: undefined,
-  });
-  await mcpServer.connect(transport);
+  const transport = new StreamableHTTPServerTransport();
+  await mcpServer.connect(transport as unknown as Transport);
 
   // -----  create http server using express, integrate x402 middleware  -----
   const app = express();
   app.use(express.json());
 
   const mcpPayment = paymentMiddleware(
-    process.env.A2_ADDRESS as `0x${string}`,
     {
       'POST /mcp': {
-        price: '$0.005',
-        network: network,
+        accepts: {
+          scheme: 'exact',
+          price: '$0.005',
+          network,
+          payTo: process.env.A2_ADDRESS as `0x${string}`,
+        },
       },
     },
-    {
-      url: process.env.FACILITATOR_URL as Resource,
-    },
+    resourceServer,
   );
 
   // -----  add mcp endpoint  -----
-  app.post('/mcp', (req: Request, res: Response, next) => {
-    if (req.body?.method === 'tools/call') { // only charge when tool call (prevent charge on connect ：( )
-      return mcpPayment(req, res, next);
-    }
-    return next();
-  }, async (req: Request, res: Response) => {
-    try {
-      const isToolCall = req.body?.method === 'tools/call';
-      const payerAddress = isToolCall ? getPayerAddressFromX402Header(req) : undefined;
-
-      if (isToolCall) {
-        console.log('----------  x402 payerAddress in header  ----------');
-        console.log(payerAddress);
-        console.log('----------  x402 payerAddress in header  ----------\n');
+  app.post(
+    '/mcp',
+    (req: Request, res: Response, next) => {
+      if (req.body?.method === 'tools/call') {
+        // only charge when tool call (prevent charge on connect ：( )
+        return mcpPayment(req, res, next);
       }
+      return next();
+    },
+    async (req: Request, res: Response) => {
+      try {
+        const isToolCall = req.body?.method === 'tools/call';
+        const payerAddress = isToolCall ? getPayerAddressFromX402Header(req) : undefined;
 
-      const store: RequestContext = payerAddress ? { payerAddress } : {};
-      await requestContext.run(store, async () => { // save payerAddress in store first, use it in generate_image tool later
-        await transport.handleRequest(req, res, req.body); // use transport to convert mcp <-> http
-      });
-    } catch (error) {
-      console.error('Error handling MCP request:', error);
-      if (!res.headersSent) {
-        res.status(500).json({
-          jsonrpc: '2.0',
-          error: { code: -32603, message: 'Internal server error' },
-          id: null,
+        if (isToolCall) {
+          console.log('----------  x402 payerAddress in header  ----------');
+          console.log(payerAddress);
+          console.log('----------  x402 payerAddress in header  ----------\n');
+        }
+
+        const store: RequestContext = payerAddress ? { payerAddress } : {};
+        await requestContext.run(store, async () => {
+          // save payerAddress in store first, use it in generate_image tool later
+          await transport.handleRequest(req, res, req.body); // use transport to convert mcp <-> http
         });
+      } catch (error) {
+        console.error('Error handling MCP request:', error);
+        if (!res.headersSent) {
+          res.status(500).json({
+            jsonrpc: '2.0',
+            error: { code: -32603, message: 'Internal server error' },
+            id: null,
+          });
+        }
       }
-    }
-  });
+    },
+  );
 
   const PORT = process.env.A2_SERVER_PORT;
   app.listen(PORT, () => {

@@ -16,7 +16,8 @@
     "TAVILY",
     "TRAVILY",
     "tvly",
-    "uuidv"
+    "uuidv",
+    "viem"
   ],
   "chatgpt.commentCodeLensEnabled": false,
   "eslint.useFlatConfig": true,

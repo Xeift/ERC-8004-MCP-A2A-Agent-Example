@@ -11,11 +11,14 @@ import {
 import { agentCardHandler, jsonRpcHandler, UserBuilder } from '@a2a-js/sdk/server/express';
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { StreamableHTTPServerTransport } from '@modelcontextprotocol/sdk/server/streamableHttp.js';
+import type { Transport } from '@modelcontextprotocol/sdk/shared/transport.js';
+import { HTTPFacilitatorClient, x402ResourceServer } from '@x402/core/server';
+import type { Network } from '@x402/core/types';
+import { registerExactEvmScheme } from '@x402/evm/exact/server';
+import { paymentMiddleware } from '@x402/express';
 import { AsyncLocalStorage } from 'async_hooks';
 import express, { type Request, type Response } from 'express';
 import { v4 as uuidv4 } from 'uuid';
-import { paymentMiddleware, type Resource } from 'x402-express';
-import { NetworkSchema } from 'x402/types';
 import { z } from 'zod';
 import { getAgentId } from '../erc-8004/agent-id-manager.js';
 import { FeedbackManager } from '../erc-8004/feedback-manager.js';
@@ -77,7 +80,15 @@ async function main() {
     throw new Error(
       "In order to accept feedback from client agent, it's required to use `register:a1` first to register the agent on chain!",
     );
-  const network = NetworkSchema.parse(process.env.CHAIN_NAME);
+  const network = `eip155:${process.env.CHAIN_ID}` as Network;
+  const facilitatorUrl = process.env.FACILITATOR_URL;
+  if (!network) throw new Error('Missing CHAIN_ID in .env');
+  if (!facilitatorUrl) throw new Error('Missing FACILITATOR_URL in .env');
+
+  const facilitator = new HTTPFacilitatorClient({ url: facilitatorUrl });
+  const resourceServer = registerExactEvmScheme(new x402ResourceServer(facilitator), {
+    networks: [network],
+  });
 
   // ========================================
   // ========================================
@@ -159,10 +170,8 @@ async function main() {
   );
 
   // -----  convert http <-> mcp  -----
-  const transport = new StreamableHTTPServerTransport({
-    sessionIdGenerator: undefined,
-  });
-  await mcpServer.connect(transport);
+  const transport = new StreamableHTTPServerTransport();
+  await mcpServer.connect(transport as unknown as Transport);
 
   // ========================================
   // ========================================
@@ -261,17 +270,18 @@ async function main() {
   app.use(express.json());
 
   const mcpPayment = paymentMiddleware(
-    process.env.A1_ADDRESS as `0x${string}`,
     {
       'POST /mcp': {
-        price: '$0.002',
-        network: network,
-        config: { maxTimeoutSeconds: 180 },
+        accepts: {
+          scheme: 'exact',
+          price: '$0.002',
+          network,
+          payTo: process.env.A1_ADDRESS as `0x${string}`,
+          maxTimeoutSeconds: 180,
+        },
       },
     },
-    {
-      url: process.env.FACILITATOR_URL as Resource,
-    },
+    resourceServer,
   );
 
   // -----  add mcp endpoint  -----
@@ -313,15 +323,18 @@ async function main() {
   );
 
   const a2aPayment = paymentMiddleware(
-    process.env.A1_ADDRESS as `0x${string}`,
     {
       'POST /a2a/jsonrpc': {
-        price: '$0.002',
-        network,
-        config: { maxTimeoutSeconds: 180 },
+        accepts: {
+          scheme: 'exact',
+          price: '$0.002',
+          network,
+          payTo: process.env.A1_ADDRESS as `0x${string}`,
+          maxTimeoutSeconds: 180,
+        },
       },
     },
-    { url: process.env.FACILITATOR_URL as Resource },
+    resourceServer,
   );
 
   // -----  add a2a endpoint  -----

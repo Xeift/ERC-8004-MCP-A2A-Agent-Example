@@ -1,13 +1,16 @@
+import { decodePaymentSignatureHeader } from '@x402/core/http';
+import type { Network } from '@x402/core/types';
+import { registerExactEvmScheme } from '@x402/evm/exact/client';
+import { decodePaymentResponseHeader, wrapFetchWithPayment, x402Client } from '@x402/fetch';
 import 'dotenv/config';
-import { createSigner, decodeXPaymentResponse, wrapFetchWithPayment } from 'x402-fetch';
-import { decodePayment } from 'x402/schemes';
+import { privateKeyToAccount } from 'viem/accounts';
 import { FeedbackManager } from '../erc-8004/feedback-manager.js';
 
 type FetchLike = typeof fetch;
 let fetchWithPayment: FetchLike | null = null;
 
 // prevent 406 error: Not Acceptable: Client must accept both application/json and text/event-stream
-// 
+//
 // 1. a3 mcp client will send request with following header:
 // headers.set('content-type', 'application/json');
 // headers.set('accept', 'application/json, text/event-stream');
@@ -35,100 +38,104 @@ let fetchWithPayment: FetchLike | null = null;
 // it thinks the request might be wrong and respond with 406
 
 function normalizeHeaders(headers: RequestInit['headers']): HeadersInit | undefined {
-    if (!headers) return undefined;
-    if (headers instanceof Headers) {
-        return Object.fromEntries(headers.entries());
-    }
-    if (Array.isArray(headers)) { // headers object -> normal object
-        return Object.fromEntries(headers);
-    }
-    return { ...headers };
+  if (!headers) return undefined;
+  if (headers instanceof Headers) {
+    return Object.fromEntries(headers.entries());
+  }
+  if (Array.isArray(headers)) {
+    // headers object -> normal object
+    return Object.fromEntries(headers);
+  }
+  return { ...headers };
 }
 
 function getHeaderValue(headers: RequestInit['headers'], name: string): string | undefined {
-    if (!headers) return undefined;
-    const lowerName = name.toLowerCase();
-    if (headers instanceof Headers) {
-        return headers.get(name) ?? headers.get(lowerName) ?? undefined;
-    }
-    if (Array.isArray(headers)) {
-        const match = headers.find(([key]) => key.toLowerCase() === lowerName);
-        return match?.[1];
-    }
-    const record = headers as Record<string, string | string[] | undefined>;
-    const value = record[name] ?? record[lowerName];
-    if (Array.isArray(value)) return value.join(', ');
-    return typeof value === 'string' ? value : undefined;
+  if (!headers) return undefined;
+  const lowerName = name.toLowerCase();
+  if (headers instanceof Headers) {
+    return headers.get(name) ?? headers.get(lowerName) ?? undefined;
+  }
+  if (Array.isArray(headers)) {
+    const match = headers.find(([key]) => key.toLowerCase() === lowerName);
+    return match?.[1];
+  }
+  const record = headers as Record<string, string | string[] | undefined>;
+  const value = record[name] ?? record[lowerName];
+  if (Array.isArray(value)) return value.join(', ');
+  return typeof value === 'string' ? value : undefined;
 }
 
 function extractAmountFromPaymentHeader(paymentHeader: string | undefined): string | undefined {
-    if (!paymentHeader) return undefined;
-    try {
-        const decoded = decodePayment(paymentHeader);
-        const payload = decoded.payload as { authorization?: { value?: string } };
-        const value = payload.authorization?.value;
-        return typeof value === 'string' ? value : undefined;
-    } catch {
-        return undefined;
-    }
+  if (!paymentHeader) return undefined;
+  try {
+    const decoded = decodePaymentSignatureHeader(paymentHeader) as {
+      accepted?: { amount?: string };
+      payload?: { authorization?: { value?: string } };
+    };
+    if (typeof decoded?.accepted?.amount === 'string') return decoded.accepted.amount;
+    const value = decoded?.payload?.authorization?.value;
+    return typeof value === 'string' ? value : undefined;
+  } catch {
+    return undefined;
+  }
 }
 
 export async function x402Fetch(privateKey: string) {
-    if (!fetchWithPayment) {
-        const signer = await createSigner(process.env.CHAIN_NAME!, privateKey);
-        const instrumentedFetch: FetchLike = async (input, init) => {
-            const response = await fetch(input, init);
-            const paymentHeader = getHeaderValue(init?.headers, 'X-PAYMENT');
-            const paymentResponseHeader = response.headers.get('X-PAYMENT-RESPONSE');
-            let amount: string | undefined;
-            let txHash: string | undefined;
-            let payer: string | undefined;
+  if (!fetchWithPayment) {
+    const network = `eip155:${process.env.CHAIN_ID}` as Network;
+    if (!network) throw new Error('Missing CHAIN_ID in .env');
 
-            if (paymentHeader || paymentResponseHeader) {
-                amount = extractAmountFromPaymentHeader(paymentHeader);
+    const normalizedKey = privateKey.startsWith('0x') ? privateKey : `0x${privateKey}`;
+    const account = privateKeyToAccount(normalizedKey as `0x${string}`);
+    const client = new x402Client();
+    registerExactEvmScheme(client, { signer: account, networks: [network] });
 
-                if (paymentResponseHeader) {
-                    try {
-                        const decoded = decodeXPaymentResponse(paymentResponseHeader);
-                        txHash = decoded.transaction;
-                        payer = decoded.payer;
-                    }
-                    catch {
-                    }
-                }
-            }
+    const instrumentedFetch: FetchLike = async (input, init) => {
+      const response = await fetch(input, init);
+      const paymentHeader =
+        getHeaderValue(init?.headers, 'PAYMENT-SIGNATURE') ??
+        getHeaderValue(init?.headers, 'X-PAYMENT');
+      const paymentResponseHeader =
+        response.headers.get('PAYMENT-RESPONSE') ?? response.headers.get('X-PAYMENT-RESPONSE');
+      let amount: string | undefined;
+      let txHash: string | undefined;
+      let payer: string | undefined;
 
-            let amountNumber: number | undefined;
-            if (amount !== undefined) {
-                const parsedAmount = Number.parseFloat(amount);
-                if (Number.isFinite(parsedAmount)) {
-                    amountNumber = parsedAmount;
-                }
-            }
-            if (amountNumber !== undefined || txHash || payer) {
-                FeedbackManager.saveFeedbackMaterial(
-                    undefined,
-                    undefined,
-                    amountNumber,
-                    txHash,
-                    payer,
-                );
-            }
+      if (paymentHeader || paymentResponseHeader) {
+        amount = extractAmountFromPaymentHeader(paymentHeader);
 
-            return response;
-        };
-        const paidFetch = wrapFetchWithPayment(instrumentedFetch, signer);
-        fetchWithPayment = (input, init) => {
-            if (!init) {
-                return paidFetch(input as RequestInfo, init);
-            }
-            const normalizedHeaders = normalizeHeaders(init.headers);
-            const normalizedInit = normalizedHeaders
-                ? { ...init, headers: normalizedHeaders }
-                : init;
-            return paidFetch(input as RequestInfo, normalizedInit);
-        };
-    }
+        if (paymentResponseHeader) {
+          try {
+            const decoded = decodePaymentResponseHeader(paymentResponseHeader);
+            txHash = decoded.transaction;
+            payer = decoded.payer;
+          } catch {}
+        }
+      }
 
-    return fetchWithPayment;
+      let amountNumber: number | undefined;
+      if (amount !== undefined) {
+        const parsedAmount = Number.parseFloat(amount);
+        if (Number.isFinite(parsedAmount)) {
+          amountNumber = parsedAmount;
+        }
+      }
+      if (amountNumber !== undefined || txHash || payer) {
+        FeedbackManager.saveFeedbackMaterial(undefined, undefined, amountNumber, txHash, payer);
+      }
+
+      return response;
+    };
+    const paidFetch = wrapFetchWithPayment(instrumentedFetch, client);
+    fetchWithPayment = (input, init) => {
+      if (!init) {
+        return paidFetch(input as RequestInfo, init);
+      }
+      const normalizedHeaders = normalizeHeaders(init.headers);
+      const normalizedInit = normalizedHeaders ? { ...init, headers: normalizedHeaders } : init;
+      return paidFetch(input as RequestInfo, normalizedInit);
+    };
+  }
+
+  return fetchWithPayment;
 }

@@ -24,13 +24,15 @@
     "@a2a-js/sdk": "^0.3.6",
     "@modelcontextprotocol/sdk": "^1.24.3",
     "@openai/agents": "^0.3.4",
+    "@x402/core": "^2.1.0",
+    "@x402/evm": "^2.1.0",
+    "@x402/express": "^2.1.0",
+    "@x402/fetch": "^2.1.0",
     "agent0-sdk": "file:agent0-sdk-0.31.0-patched.tgz",
     "dotenv": "^17.2.3",
     "express": "^5.2.1",
     "openai": "^6.10.0",
     "uuid": "^13.0.0",
-    "x402-express": "^1.0.0",
-    "x402-fetch": "^1.0.0",
     "zod": "^3.25.76"
   },
   "devDependencies": {
