@@ -11,6 +11,7 @@
     "server:a1": "npm run build && node dist/agent1/server.js",
     "server:a2": "npm run build && node dist/agent2/server.js",
     "agent:a3": "npm run build && node dist/agent3/index.js",
+    "facilitator": "npm run build && node dist/x402/facilitator.js",
     "register:a1": "npm run build && node dist/erc-8004/register-agent1.js",
     "register:a2": "npm run build && node dist/erc-8004/register-agent2.js",
     "register:a3": "npm run build && node dist/erc-8004/register-agent3.js",
